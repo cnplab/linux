@@ -118,39 +118,11 @@ static int evtchnn_bind_interdomain(unsigned int domid, evtchn_port_t port)
 {
 	int rc;
 
-	struct evtchn_bind_interdomain bind_interdomain;
-
-	/*rc = -EFAULT;
-	if (copy_from_user(&bind, uarg, sizeof(bind)))
-		break;*/
-
-	/*rc = -EACCES;
-	if (u->restrict_domid != UNRESTRICTED_DOMID &&
-	    u->restrict_domid != bind.remote_domain)
-		break;*/
-
-	/*bind_interdomain.remote_dom  = domid;
-	bind_interdomain.remote_port = port;
-	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &bind_interdomain);
-	if (rc != 0) {
-		printk("HYPERVISOR_event_channel_op failed %i\n", rc);
-		return rc;
-	}*/
-
-	/*rc = evtchn_bind_to_user(u, bind_interdomain.local_port);
-	if (rc == 0)
-		rc = bind_interdomain.local_port;
-	break;*/
-
 
 	int err;
-#if 1
+
 	err = bind_interdomain_evtchn_to_irqhandler(domid, port, wake_waiting,
 						    0, "noxs", &noxs_events_waitq);
-#else
-	err = bind_evtchn_to_irqhandler(bind_interdomain.local_port, wake_waiting,
-					0, "noxs", &noxs_events_waitq);
-#endif
 	if (err < 0) {
 		printk("bind_evtchn_to_irqhandler failed %i\n", err);
 		return err;
