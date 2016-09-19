@@ -1,5 +1,5 @@
 /*
- * noxenbus.c
+ * noxs.c
  *
  *  Created on: Sep 15, 2016
  *      Author: wolf
@@ -18,6 +18,8 @@
 
 #include <xen/xen.h>
 #include <xen/events.h>
+#include <xen/evtchn.h>
+#include <xen/grant_table.h>
 
 
 struct domain
@@ -58,21 +60,34 @@ static LIST_HEAD(domains);
 
 
 
+static DEFINE_MUTEX(noxs_mutex);
 static DECLARE_WAIT_QUEUE_HEAD(noxs_events_waitq);
+
 static LIST_HEAD(noxs_events);
+static DEFINE_SPINLOCK(noxs_events_lock);
 
 
 
 static void *map_interface(domid_t domid, unsigned long mfn)
 {
-	if (*xgt_handle != NULL) {
-		/* this is the preferred method */
+/*	if (*xgt_handle != NULL) {
+		 this is the preferred method
 		return xengnttab_map_grant_ref(*xgt_handle, domid,
 			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
 	} else {
 		return xc_map_foreign_range(*xc_handle, domid,
 			XC_PAGE_SIZE, PROT_READ|PROT_WRITE, mfn);
+	}*/
+	int rc;
+
+	rc = gnttab_grant_foreign_access(domid, mfn, 0);
+	if (rc < 0) {
+		printk("error mapping gnt");
 	}
+	else
+	printk("noxs map success\n");
+
+	return rc;
 }
 
 static void unmap_interface(void *interface)
@@ -83,11 +98,26 @@ static void unmap_interface(void *interface)
 		munmap(interface, XC_PAGE_SIZE);*/
 }
 
+static irqreturn_t wake_waiting(int irq, void *unused)
+{
+	/*if (unlikely(xenstored_ready == 0)) {
+		xenstored_ready = 1;
+		schedule_work(&probe_work);
+	}*/
+	struct list_head *list;
+	printk("noxs event recvd\n");
+
+	list = kzalloc(sizeof(struct list_head), GFP_KERNEL);
+	list_add_tail(list, &noxs_events);
+
+	wake_up(&noxs_events_waitq);
+	return IRQ_HANDLED;
+}
+
 static int evtchnn_bind_interdomain(unsigned int domid, evtchn_port_t port)
 {
 	int rc;
 
-	struct ioctl_evtchn_bind_interdomain bind;
 	struct evtchn_bind_interdomain bind_interdomain;
 
 	/*rc = -EFAULT;
@@ -99,16 +129,34 @@ static int evtchnn_bind_interdomain(unsigned int domid, evtchn_port_t port)
 	    u->restrict_domid != bind.remote_domain)
 		break;*/
 
-	bind_interdomain.remote_dom  = domid;
+	/*bind_interdomain.remote_dom  = domid;
 	bind_interdomain.remote_port = port;
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &bind_interdomain);
-	/*if (rc != 0)
-		break;*/
+	if (rc != 0) {
+		printk("HYPERVISOR_event_channel_op failed %i\n", rc);
+		return rc;
+	}*/
 
 	/*rc = evtchn_bind_to_user(u, bind_interdomain.local_port);
 	if (rc == 0)
 		rc = bind_interdomain.local_port;
 	break;*/
+
+
+	int err;
+#if 1
+	err = bind_interdomain_evtchn_to_irqhandler(domid, port, wake_waiting,
+						    0, "noxs", &noxs_events_waitq);
+#else
+	err = bind_evtchn_to_irqhandler(bind_interdomain.local_port, wake_waiting,
+					0, "noxs", &noxs_events_waitq);
+#endif
+	if (err < 0) {
+		printk("bind_evtchn_to_irqhandler failed %i\n", err);
+		return err;
+	}
+
+	//TODO xenbus_irq = err;
 
 	return rc;
 }
@@ -163,8 +211,6 @@ static int destroy_domain(void *_domain)
 			unmap_interface(domain->interface);
 	}
 
-	fire_watches(NULL, domain, "@releaseDomain", false);
-
 	return 0;
 }
 
@@ -180,7 +226,7 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->domid = domid;
 
 	list_add(&domain->list, &domains);
-	talloc_set_destructor(domain, destroy_domain);
+	//talloc_set_destructor(domain, destroy_domain);
 
 	/* Tell kernel we're interested in this event. */
 	//rc = xenevtchn_bind_interdomain(xce_handle, domid, port);
@@ -333,24 +379,52 @@ static struct task_struct *task = NULL;
 const struct file_operations xen_noxs_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = noxs_ioctl,
-	//.mmap = privcmd_mmap,
 };
 EXPORT_SYMBOL_GPL(xen_noxs_fops);
 
 static struct miscdevice privcmd_dev = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "xen/noxenbus",
+	.name = "xen/noxs",
 	.fops = &xen_noxs_fops,
 };
 
 static int noxs_thread(void *unused)
 {
-	struct list_head *ent;
-	struct xs_stored_msg *msg;
+	struct list_head *ent, *i;
+
+	int count;
 
 	for (;;) {
 		wait_event_interruptible(noxs_events_waitq,
 					 !list_empty(&noxs_events));
+
+		count = 0;
+		list_for_each(i, &noxs_events)
+			count++;
+
+		printk("----noxs event recvd %d\n", count);
+
+		mutex_lock(&noxs_mutex);
+
+		spin_lock(&noxs_events_lock);
+		ent = noxs_events.next;
+		if (ent != &noxs_events)
+			list_del(ent);
+		spin_unlock(&noxs_events_lock);
+
+		if (ent != &noxs_events) {
+			/*msg = list_entry(ent, struct xs_stored_msg, list);
+			pr_debug("watched\n");
+			msg->u.watch.handle->callback(
+				msg->u.watch.handle,
+				(const char **)msg->u.watch.vec,
+				msg->u.watch.vec_size);
+			kfree(msg->u.watch.vec);
+			kfree(msg);*/
+			kfree(ent);
+		}
+
+		mutex_unlock(&noxs_mutex);
 
 		if (kthread_should_stop())
 			break;
@@ -367,7 +441,7 @@ static int __init noxs_init(void)
 
 	//int err;
 
-	task = kthread_run(noxs_thread, NULL, "noxenbus");
+	task = kthread_run(noxs_thread, NULL, "noxs");
 	if (IS_ERR(task))
 		return PTR_ERR(task);
 	//xennoxs_pid = task->pid;
@@ -404,4 +478,4 @@ static void __exit noxs_fini(void)
 module_exit(noxs_fini);
 
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("noxenbus");
+MODULE_ALIAS("noxs");
