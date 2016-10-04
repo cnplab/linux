@@ -8,47 +8,42 @@
 #ifndef INCLUDE_UAPI_XEN_NOXS_H_
 #define INCLUDE_UAPI_XEN_NOXS_H_
 
-//#include <linux/types.h>
-//#include <linux/compiler.h>
+#include <linux/ioctl.h>
 
 #include <xen/interface/noxs.h>
 
-
-
-typedef unsigned int evtchn_port_t;//TODO remove
-
-/*
-struct noxs_devpage_reg {
-	unsigned int domid;
-	evtchn_port_t port;
-	unsigned int mfn;
-};
-*/
-
-struct noxs_user_vif {
+struct noxs_ioctl_dev_create {
 	/* IN */
-	__u8 mac[ETH_ALEN];
-	__be32 ip;
-	/* OUT */
-};
-
-struct noxs_ioctl_devreq {
-	/* IN */
-	enum noxs_dev_type type;
-	unsigned int domid;
-	unsigned int devid; /* WIP */
+	noxs_dev_key_t key;
 
 	union { /* device specific */
-		struct noxs_user_vif vif;
-	} dev;
+		noxs_cfg_vif_t vif;
+	} cfg;
 
 	/* OUT */
-	unsigned int mfn;//TODO rename
-	evtchn_port_t evtchn;
+	noxs_dev_comm_t comm;
+};
+
+struct noxs_ioctl_dev_destroy {
+	/* IN */
+	noxs_dev_key_t key;
+};
+
+struct noxs_ioctl_dev_list {
+	/* IN */
+	noxs_dev_key_t key;
+
+	/* OUT */
+	uint32_t count;
+	noxs_dev_id_t ids[NOXS_DEV_COUNT_MAX];
 };
 
 
-#define IOCTL_NOXS_DEVREQ \
-	_IOC(_IOC_NONE, 'P', 1, sizeof(struct noxs_ioctl_devreq))
+#define IOCTL_NOXS_DEV_CREATE \
+	_IOC(_IOC_NONE, 'P', 0, sizeof(struct noxs_ioctl_dev_create))
+#define IOCTL_NOXS_DEV_DESTROY \
+	_IOC(_IOC_NONE, 'P', 1, sizeof(struct noxs_ioctl_dev_destroy))
+#define IOCTL_NOXS_DEV_LIST \
+	_IOC(_IOC_NONE, 'P', 2, sizeof(struct noxs_ioctl_dev_list))
 
 #endif /* INCLUDE_UAPI_XEN_NOXS_H_ */
