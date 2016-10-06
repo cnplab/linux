@@ -9,33 +9,65 @@
 #define INCLUDE_UAPI_XEN_NOXS_H_
 
 #include <linux/ioctl.h>
+#include <linux/if_ether.h>
 
-#include <xen/interface/noxs.h>
+
+#define NOXS_USER_DEV_MAX 32
+
+enum noxs_user_dev_type {
+	noxs_user_dev_none = 0,
+	noxs_user_dev_console,
+	noxs_user_dev_vif,
+};
+
+
+/*
+ * Device configuration
+ */
+struct noxs_user_cfg_vif {
+	__u8 mac[ETH_ALEN];
+	__be32 ip;
+};
+
+
+/*
+ *
+ */
 
 struct noxs_ioctl_dev_create {
 	/* IN */
-	noxs_dev_key_t key;
+	enum noxs_user_dev_type type;
+	__u16 be_id;
+	__u16 fe_id;
 
 	union { /* device specific */
-		noxs_cfg_vif_t vif;
+		struct noxs_user_cfg_vif vif;
 	} cfg;
 
 	/* OUT */
-	noxs_dev_comm_t comm;
+	__u32 devid;
+	__u32 grant;
+	__u32 evtchn;
 };
 
 struct noxs_ioctl_dev_destroy {
 	/* IN */
-	noxs_dev_key_t key;
+	enum noxs_user_dev_type type;
+	__u16 be_id;
+	__u16 fe_id;
+	__u32 devid;
 };
 
 struct noxs_ioctl_dev_list {
 	/* IN */
-	noxs_dev_key_t key;
+	enum noxs_user_dev_type type;
+	__u16 be_id;
+	__u16 fe_id;
+	__u32 devid;
 
 	/* OUT */
-	uint32_t count;
-	noxs_dev_id_t ids[NOXS_DEV_COUNT_MAX];
+	__u32 count;
+	__u32 ids[NOXS_USER_DEV_MAX];
 };
 
 
