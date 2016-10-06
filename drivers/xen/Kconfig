@@ -298,4 +298,11 @@ config XEN_SYMS
 config XEN_HAVE_VPMU
        bool
 
+config XEN_NOXS
+	bool "Xen no xenstore"
+	depends on XEN_BACKEND && XENFS
+	default n
+	help
+	  Support for device creation without using Xenstore.
+
 endmenu

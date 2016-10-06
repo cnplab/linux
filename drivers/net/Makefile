@@ -64,7 +64,7 @@ obj-$(CONFIG_IEEE802154) += ieee802154/
 
 obj-$(CONFIG_VMXNET3) += vmxnet3/
 obj-$(CONFIG_XEN_NETDEV_FRONTEND) += xen-netfront.o
-obj-$(CONFIG_XEN_NETDEV_BACKEND) += xen-netback/
+obj-$(CONFIG_XEN_NETDEV_BACKEND) += xen-netback/ xen-netback-noxs/
 
 obj-$(CONFIG_USB_NET_DRIVERS) += usb/
 
