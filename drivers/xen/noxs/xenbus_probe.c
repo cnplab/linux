@@ -454,10 +454,7 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 		return -ENOMEM;
 
 	xendev->otherend_id = key->fe_id;
-	xendev->id = key->devid;//TODO
-
 	xendev->state = XenbusStateInitialising;
-
 	xendev->devicetype = key->type;
 	init_completion(&xendev->down);
 

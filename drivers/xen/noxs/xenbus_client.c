@@ -479,11 +479,13 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 }
 EXPORT_SYMBOL_GPL(xenbus_alloc_evtchn);
 
+#ifdef CONFIG_XEN_BACKEND_NOXS
 int xenbus_alloc_evtchn_remote(struct xenbus_device *dev, int *port)
 {
 	return alloc_evtchn(dev, dev->otherend_id, DOMID_SELF, port);
 }
 EXPORT_SYMBOL_GPL(xenbus_alloc_evtchn_remote);
+#endif
 
 
 /**

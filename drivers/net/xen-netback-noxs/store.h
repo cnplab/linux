@@ -28,8 +28,7 @@
 #define __XEN_NETBACK__STORE_H__
 
 
-int store_write_netback_probe_info(struct xenbus_device *xdev,
-		const struct xenbus_device_id *id);
+int store_write_init_info(struct xenbus_device *xdev);
 int store_read_handle(struct xenbus_device *xdev,
 		long *handle);
 void store_read_rate(struct xenbus_device *dev,
@@ -46,5 +45,7 @@ int store_read_data_rings_info(struct xenbus_device *xdev,
 		unsigned int *tx_evtchn, unsigned int *rx_evtchn);
 int store_read_vif_flags(struct xenbus_device *xdev,
 		struct xenvif *vif);
+
+void store_destroy(void);//TODO temporary
 
 #endif /* __XEN_NETBACK__STORE_H__ */

@@ -271,7 +271,7 @@ static int netback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	dev_set_drvdata(&dev->dev, be);
 
-	err = store_write_netback_probe_info(dev, id);//TODO our data
+	err = store_write_init_info(dev);
 	if (err)
 		goto fail;
 
@@ -884,5 +884,7 @@ int xenvif_xenbus_init(void)
 
 void xenvif_xenbus_fini(void)
 {
+	store_destroy();
+
 	return xenbus_unregister_driver(&netback_driver);
 }

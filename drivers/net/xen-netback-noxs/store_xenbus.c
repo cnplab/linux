@@ -9,7 +9,7 @@
 #include "store.h"
 
 
-int store_write_netback_probe_info(struct xenbus_device *dev, const struct xenbus_device_id *id)
+int store_write_init_info(struct xenbus_device *dev)
 {
 	const char *message;
 	struct xenbus_transaction xbt;

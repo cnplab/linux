@@ -9,50 +9,29 @@
 #include "store.h"
 
 
-int store_write_netback_probe_info(struct xenbus_device *xdev, const struct xenbus_device_id *id)
+int store_write_init_info(struct xenbus_device *xdev)
 {
-#if 0
-	sg = 1;
-		err = xenbus_printf(xbt, xdev->nodename, "feature-sg", "%d", sg);
-		err = xenbus_printf(xbt, xdev->nodename, "feature-gso-tcpv4", "%d", sg);
-		err = xenbus_printf(xbt, xdev->nodename, "feature-gso-tcpv6", "%d", sg);
-		/* We support partial checksum setup for IPv6 packets */
-		err = xenbus_printf(xbt, xdev->nodename, "feature-ipv6-csum-offload", "%d", 1);
-		/* We support rx-copy path. */
-		err = xenbus_printf(xbt, xdev->nodename, "feature-rx-copy", "%d", 1);
-		/* We don't support rx-flip path (except old guests who don't grok this feature flag). */
-		err = xenbus_printf(xbt, xdev->nodename, "feature-rx-flip", "%d", 0);
-		/* We support dynamic multicast-control. */
-		err = xenbus_printf(xbt, xdev->nodename, "feature-multicast-control", "%d", 1);
-		err = xenbus_printf(xbt, xdev->nodename, "feature-dynamic-multicast-control", "%d", 1);
-
-	/* Split event channels support, this is optional so it is not put inside the above loop. */
-	err = xenbus_printf(XBT_NIL, xdev->nodename, "feature-split-event-channels", "%u", separate_tx_rx_irq);
-	/* Multi-queue support: This is an optional feature. */
-	err = xenbus_printf(XBT_NIL, xdev->nodename, "multi-queue-max-queues", "%u", xenvif_max_queues);
-	err = xenbus_printf(XBT_NIL, xdev->nodename, "feature-ctrl-ring", "%u", true);
-	script = xenbus_read(XBT_NIL, xdev->nodename, "script", NULL);
-#endif
 	noxs_vif_ctrl_page_t *page = xdev->ctrl_page;
 	noxs_cfg_vif_t *cfg = xdev->dev_cfg;
+	int sg = 1;
 
-	page->hdr.domid    = xdev->otherend_id;
-	page->hdr.evtchn   = xdev->remote_port;
+	page->hdr.domid = xdev->otherend_id;
+	page->hdr.evtchn = xdev->remote_port;
 	page->hdr.be_state = XenbusStateUnknown;
 	page->hdr.fe_state = XenbusStateUnknown;
-	page->vifid    = xdev->id; //TODO vc->vif;
+	/*page->vifid = xdev->id; //TODO vc->vif;*/
 
 	memset(&page->feature, 0, sizeof(page->feature));//TODO needed?
-	page->feature.sg = 1;
-	page->feature.gso_tcpv4 = 1;
-	page->feature.gso_tcpv6 = 1;
+	page->feature.sg = sg;
+	page->feature.gso_tcpv4 = sg;
+	page->feature.gso_tcpv6 = sg;
 	page->feature.ipv6_csum_offload = 1;
 	page->feature.rx_copy = 1;
-	page->feature.rx_flip = 1;
+	page->feature.rx_flip = 0;
 	page->feature.multicast_control = 1;
 	page->feature.dynamic_multicast_control = 1;
 
-	page->feature.split_event_channels = 1;//TODO separate_tx_rx_irq
+	page->feature.split_event_channels = separate_tx_rx_irq;
 	page->feature.ctrl_ring = 1;
 
 	page->multi_queue_max_queues = xenvif_max_queues;
@@ -71,13 +50,74 @@ int store_write_netback_probe_info(struct xenbus_device *xdev, const struct xenb
 	return 0;
 }
 
-int store_read_handle(struct xenbus_device *xdev, long *handle)
+/*********************************************************
+ * TODO TEMPORARY, not a scalable solution:
+ */
+
+struct noxs_dev_counter {
+	struct list_head list;
+	domid_t fe_id;
+	int next_id;
+	int dev_num;
+};
+
+static LIST_HEAD(device_counters);
+
+static int netback_alloc_id(struct xenbus_device *xdev)
 {
+	struct noxs_dev_counter *c;
+
+	list_for_each_entry(c, &device_counters, list) {
+		if (c->fe_id == xdev->otherend_id)
+			goto out;
+	}
+
+	c = kzalloc(sizeof(struct noxs_dev_counter), GFP_KERNEL);
+	if (!c) {
+		xenbus_dev_fatal(xdev, -ENOMEM, "allocating device id");
+		return -ENOMEM;
+	}
+
+	c->fe_id = xdev->otherend_id;
+	list_add(&c->list, &device_counters);
+
+out:
+	xdev->id = c->next_id++;
+	c->dev_num++;
+	return 0;
+}
+
+static void netback_clear_ids(void)
+{
+	struct noxs_dev_counter *c, *tmp;
+
+	list_for_each_entry_safe(c, tmp, &device_counters, list) {
+		list_del(&c->list);
+		kfree(c);
+	}
+}
+
+int store_read_handle(struct xenbus_device *xdev,
+		long *handle)
+{
+	noxs_vif_ctrl_page_t *page;
+	int err;
+
+	err = netback_alloc_id(xdev);
+	if (err)
+		return 0;
+
 	*handle = xdev->id;
+
+	/* update control page */
+	page = xdev->ctrl_page;
+	page->vifid = xdev->id;
+
 	return 1;
 }
 
-void store_read_rate(struct xenbus_device *dev, unsigned long *bytes, unsigned long *usec)
+void store_read_rate(struct xenbus_device *dev,
+		unsigned long *bytes, unsigned long *usec)
 {
 	/* Default to unlimited bandwidth. */
 	*bytes = ~0UL;
@@ -92,8 +132,8 @@ int store_read_mac(struct xenbus_device *dev, u8 mac[])
 	return 0;
 }
 
-
-int store_read_ctrl_ring_info(struct xenbus_device *xdev, grant_ref_t *ring_ref, unsigned int *evtchn)
+int store_read_ctrl_ring_info(struct xenbus_device *xdev,
+		grant_ref_t *ring_ref, unsigned int *evtchn)
 {
 #if 0
 	struct xenbus_device *dev = be_to_device(be);
@@ -137,24 +177,18 @@ fail:
 	return 0;
 }
 
-int store_read_num_queues(struct xenbus_device *xdev, unsigned int *requested_num_queues)
+int store_read_num_queues(struct xenbus_device *xdev,
+		unsigned int *requested_num_queues)
 {
-#if 0
-	struct xenbus_device *dev = be_to_device(be);
-
-	return xenbus_scanf(XBT_NIL, dev->otherend,
-			   "multi-queue-num-queues",
-			   "%u", &requested_num_queues);
-#endif
 	struct noxs_vif_ctrl_page* page = xdev->ctrl_page;
 
 	*requested_num_queues = page->multi_queue_num_queues;
-
 	return 0;
 }
 
 
-int store_read_data_rings_info(struct xenbus_device *xdev, struct xenvif_queue *queue,
+int store_read_data_rings_info(struct xenbus_device *xdev,
+		struct xenvif_queue *queue,
 		unsigned long *tx_ring_ref, unsigned long *rx_ring_ref,
 		unsigned int *tx_evtchn, unsigned int *rx_evtchn)
 {
@@ -181,18 +215,15 @@ int store_read_data_rings_info(struct xenbus_device *xdev, struct xenvif_queue *
 	return 0;
 }
 
-int store_read_vif_flags(struct xenbus_device *xdev, struct xenvif *vif)
+int store_read_vif_flags(struct xenbus_device *xdev,
+		struct xenvif *vif)
 {
 	struct noxs_vif_ctrl_page* page = xdev->ctrl_page;
-	unsigned int rx_copy;
-	int err, val;
 
-	rx_copy = page->request_rx_copy;
-	if (!rx_copy)
+	if (!page->request_rx_copy)
 		return -EOPNOTSUPP;
 
-	val = page->feature.rx_notify;
-	if (!val) {
+	if (!page->feature.rx_notify) {
 		/* - Reduce drain timeout to poll more frequently for
 		 *   Rx requests.
 		 * - Disable Rx stall detection.
@@ -201,38 +232,37 @@ int store_read_vif_flags(struct xenbus_device *xdev, struct xenvif *vif)
 		vif->stall_timeout = 0;
 	}
 
-	val = page->feature.sg;
-	vif->can_sg = !!val;
+	vif->can_sg = !!page->feature.sg;
 
 	vif->gso_mask = 0;
 	vif->gso_prefix_mask = 0;
 
-	val = page->feature.gso_tcpv4;
-	if (val)
+	if (page->feature.gso_tcpv4)
 		vif->gso_mask |= GSO_BIT(TCPV4);
 
-	val = page->feature.gso_tcpv4_prefix;
-	if (val)
+	if (page->feature.gso_tcpv4_prefix)
 		vif->gso_prefix_mask |= GSO_BIT(TCPV4);
 
-	val = page->feature.gso_tcpv6;
-	if (val)
+	if (page->feature.gso_tcpv6)
 		vif->gso_mask |= GSO_BIT(TCPV6);
 
-	val = page->feature.gso_tcpv6_prefix;
-	if (val)
+	if (page->feature.gso_tcpv6_prefix)
 		vif->gso_prefix_mask |= GSO_BIT(TCPV6);
 
 	if (vif->gso_mask & vif->gso_prefix_mask) {
-		xenbus_dev_fatal(xdev, err, "%s: gso and gso prefix flags are not ""mutually exclusive", to_xenbus_otherend(xdev));
+		xenbus_dev_fatal(xdev, 0,
+				"%s: gso and gso prefix flags are not ""mutually exclusive",
+				to_xenbus_otherend(xdev));
 		return -EOPNOTSUPP;
 	}
 
-	val = page->feature.no_csum_offload;
-	vif->ip_csum = !val;
-
-	val = page->feature.ipv6_csum_offload;
-	vif->ipv6_csum = !!val;
+	vif->ip_csum = !page->feature.no_csum_offload;
+	vif->ipv6_csum = !!page->feature.ipv6_csum_offload;
 
 	return 0;
+}
+
+void store_destroy(void)
+{
+	netback_clear_ids();
 }
