@@ -92,21 +92,35 @@ typedef struct noxs_ctrl_hdr noxs_ctrl_hdr_t;
  * DEVICE SPECIFIC
  */
 
-struct vif_features {
-	__u8 rx_notify:1;
-	__u8 sg:1;
-	__u8 gso_tcpv4:1;
-	__u8 gso_tcpv4_prefix:1;
-	__u8 gso_tcpv6:1;
-	__u8 gso_tcpv6_prefix:1;
-	__u8 no_csum_offload:1;
-	__u8 ipv6_csum_offload:1;
-	__u8 rx_copy:1;
-	__u8 rx_flip:1;
-	__u8 multicast_control:1;
-	__u8 dynamic_multicast_control:1;
-	__u8 split_event_channels:1;
-	__u8 ctrl_ring:1;
+struct vif_be_features {
+	uint8_t rx_notify:1;
+	uint8_t sg:1;
+	uint8_t gso_tcpv4:1;
+	uint8_t gso_tcpv4_prefix:1;
+	uint8_t gso_tcpv6:1;
+	uint8_t gso_tcpv6_prefix:1;
+	uint8_t no_csum_offload:1;
+	uint8_t ipv6_csum_offload:1;
+	uint8_t rx_copy:1;
+	uint8_t rx_flip:1;
+	uint8_t multicast_control:1;
+	uint8_t dynamic_multicast_control:1;
+	uint8_t split_event_channels:1;
+	uint8_t ctrl_ring:1;
+	uint8_t netmap:1;
+};
+
+struct vif_fe_features {
+	uint8_t rx_notify:1;
+	uint8_t persistent:1;
+	uint8_t sg:1;
+	uint8_t gso_tcpv4:1;
+	uint8_t gso_tcpv4_prefix:1;
+	uint8_t gso_tcpv6:1;
+	uint8_t gso_tcpv6_prefix:1;
+	uint8_t no_csum_offload:1;
+	uint8_t ipv6_csum_offload:1;
+	uint8_t ctrl_ring:1;
 };
 
 #define ETH_ALEN    6       /* Octets in one ethernet addr TODO temporary   */
@@ -114,7 +128,7 @@ struct vif_features {
 struct noxs_vif_ctrl_page {
 	noxs_ctrl_hdr_t hdr;
 	int vifid;
-	struct vif_features feature;
+	struct vif_be_features be_feat;
 	int multi_queue_max_queues;
 	int multi_queue_num_queues;
 
@@ -124,12 +138,13 @@ struct noxs_vif_ctrl_page {
 	evtchn_port_t event_channel_rx;
 
 	unsigned int request_rx_copy;
+	struct vif_fe_features fe_feat;
 
 	grant_ref_t ctrl_ring_ref;
 	evtchn_port_t event_channel_ctrl;
 
-	__u8 mac[ETH_ALEN];
-	__be32 ip;
+	uint8_t mac[ETH_ALEN];
+	uint32_t ip;
 };
 typedef struct noxs_vif_ctrl_page noxs_vif_ctrl_page_t;
 
@@ -139,8 +154,8 @@ typedef struct noxs_vif_ctrl_page noxs_vif_ctrl_page_t;
  */
 
 struct noxs_cfg_vif {
-	__u8 mac[ETH_ALEN];
-	__be32 ip;
+	uint8_t mac[ETH_ALEN];
+	uint32_t ip;
 };
 typedef struct noxs_cfg_vif noxs_cfg_vif_t;
 

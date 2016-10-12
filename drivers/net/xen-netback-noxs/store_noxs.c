@@ -21,18 +21,18 @@ int store_write_init_info(struct xenbus_device *xdev)
 	page->hdr.fe_state = XenbusStateUnknown;
 	/*page->vifid = xdev->id; //TODO vc->vif;*/
 
-	memset(&page->feature, 0, sizeof(page->feature));//TODO needed?
-	page->feature.sg = sg;
-	page->feature.gso_tcpv4 = sg;
-	page->feature.gso_tcpv6 = sg;
-	page->feature.ipv6_csum_offload = 1;
-	page->feature.rx_copy = 1;
-	page->feature.rx_flip = 0;
-	page->feature.multicast_control = 1;
-	page->feature.dynamic_multicast_control = 1;
+	memset(&page->be_feat, 0, sizeof(page->be_feat));//TODO needed?
+	page->be_feat.sg = sg;
+	page->be_feat.gso_tcpv4 = sg;
+	page->be_feat.gso_tcpv6 = sg;
+	page->be_feat.ipv6_csum_offload = 1;
+	page->be_feat.rx_copy = 1;
+	page->be_feat.rx_flip = 0;
+	page->be_feat.multicast_control = 1;
+	page->be_feat.dynamic_multicast_control = 1;
 
-	page->feature.split_event_channels = separate_tx_rx_irq;
-	page->feature.ctrl_ring = 1;
+	page->be_feat.split_event_channels = separate_tx_rx_irq;
+	page->be_feat.ctrl_ring = 1;
 
 	page->multi_queue_max_queues = xenvif_max_queues;
 	/* at least one, if more then overwritten by frontend: */
@@ -135,38 +135,9 @@ int store_read_mac(struct xenbus_device *dev, u8 mac[])
 int store_read_ctrl_ring_info(struct xenbus_device *xdev,
 		grant_ref_t *ring_ref, unsigned int *evtchn)
 {
-#if 0
-	struct xenbus_device *dev = be_to_device(be);
-	unsigned int val;
-	int err;
-
-	err = xenbus_gather(XBT_NIL, dev->otherend,
-			    "ctrl-ring-ref", "%u", &val, NULL);
-	if (err)
-		goto done; /* The frontend does not have a control ring */
-
-	*ring_ref = val;
-
-	err = xenbus_gather(XBT_NIL, dev->otherend,
-			    "event-channel-ctrl", "%u", &val, NULL);
-	if (err) {
-		xenbus_dev_fatal(dev, err,
-				 "reading %s/event-channel-ctrl",
-				 dev->otherend);
-		goto fail;
-	}
-
-	*evtchn = val;
-
-done:
-	return 0;
-
-fail:
-	return err;
-#endif
 	struct noxs_vif_ctrl_page* page = xdev->ctrl_page;
 
-	if (page->feature.ctrl_ring) {
+	if (page->fe_feat.ctrl_ring) {
 		*ring_ref = page->ctrl_ring_ref;
 		*evtchn = page->event_channel_ctrl;
 	} else {
@@ -223,7 +194,7 @@ int store_read_vif_flags(struct xenbus_device *xdev,
 	if (!page->request_rx_copy)
 		return -EOPNOTSUPP;
 
-	if (!page->feature.rx_notify) {
+	if (!page->fe_feat.rx_notify) {
 		/* - Reduce drain timeout to poll more frequently for
 		 *   Rx requests.
 		 * - Disable Rx stall detection.
@@ -232,21 +203,21 @@ int store_read_vif_flags(struct xenbus_device *xdev,
 		vif->stall_timeout = 0;
 	}
 
-	vif->can_sg = !!page->feature.sg;
+	vif->can_sg = !!page->fe_feat.sg;
 
 	vif->gso_mask = 0;
 	vif->gso_prefix_mask = 0;
 
-	if (page->feature.gso_tcpv4)
+	if (page->fe_feat.gso_tcpv4)
 		vif->gso_mask |= GSO_BIT(TCPV4);
 
-	if (page->feature.gso_tcpv4_prefix)
+	if (page->fe_feat.gso_tcpv4_prefix)
 		vif->gso_prefix_mask |= GSO_BIT(TCPV4);
 
-	if (page->feature.gso_tcpv6)
+	if (page->fe_feat.gso_tcpv6)
 		vif->gso_mask |= GSO_BIT(TCPV6);
 
-	if (page->feature.gso_tcpv6_prefix)
+	if (page->fe_feat.gso_tcpv6_prefix)
 		vif->gso_prefix_mask |= GSO_BIT(TCPV6);
 
 	if (vif->gso_mask & vif->gso_prefix_mask) {
@@ -256,8 +227,8 @@ int store_read_vif_flags(struct xenbus_device *xdev,
 		return -EOPNOTSUPP;
 	}
 
-	vif->ip_csum = !page->feature.no_csum_offload;
-	vif->ipv6_csum = !!page->feature.ipv6_csum_offload;
+	vif->ip_csum = !page->fe_feat.no_csum_offload;
+	vif->ipv6_csum = !!page->fe_feat.ipv6_csum_offload;
 
 	return 0;
 }
