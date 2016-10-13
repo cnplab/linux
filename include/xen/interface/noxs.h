@@ -13,7 +13,7 @@
 #include "io/xenbus.h"/*TODO temporary, for XenbusState only*/
 
 
-#define NOXS_DEV_COUNT_MAX 32/*TODO this is defined at hyp level*/
+#define NOXS_DEV_COUNT_MAX 32
 
 
 typedef uint32_t noxs_dev_id_t;
@@ -59,13 +59,6 @@ struct noxs_dev_page {
 typedef struct noxs_dev_page noxs_dev_page_t;
 
 
-struct noxs_dev_entry {
-	unsigned int idx;
-	struct noxs_dev_page_entry *dev_info;
-};
-typedef struct noxs_dev_entry noxs_dev_entry_t;
-
-
 enum noxs_watch_state {
 	noxs_watch_none = 0,
 	noxs_watch_requested,
@@ -75,10 +68,7 @@ typedef enum noxs_watch_state noxs_watch_state_t;
 
 
 struct noxs_ctrl_hdr {
-	uint16_t domid;
 	int devid;
-	int grant;/*TODO???*/
-	int evtchn;/*TODO??? redundancy*/
 	int be_state;
 	int fe_state;
 
@@ -92,6 +82,7 @@ typedef struct noxs_ctrl_hdr noxs_ctrl_hdr_t;
  * DEVICE SPECIFIC
  */
 
+/* Network device */
 struct vif_be_features {
 	uint8_t rx_notify:1;
 	uint8_t sg:1;
@@ -123,7 +114,7 @@ struct vif_fe_features {
 	uint8_t ctrl_ring:1;
 };
 
-#define ETH_ALEN    6       /* Octets in one ethernet addr TODO temporary   */
+#define ETH_LEN    6       /* Octets in one ethernet address */
 
 struct noxs_vif_ctrl_page {
 	noxs_ctrl_hdr_t hdr;
@@ -143,7 +134,7 @@ struct noxs_vif_ctrl_page {
 	grant_ref_t ctrl_ring_ref;
 	evtchn_port_t event_channel_ctrl;
 
-	uint8_t mac[ETH_ALEN];
+	uint8_t mac[ETH_LEN];
 	uint32_t ip;
 };
 typedef struct noxs_vif_ctrl_page noxs_vif_ctrl_page_t;
@@ -154,7 +145,7 @@ typedef struct noxs_vif_ctrl_page noxs_vif_ctrl_page_t;
  */
 
 struct noxs_cfg_vif {
-	uint8_t mac[ETH_ALEN];
+	uint8_t mac[ETH_LEN];
 	uint32_t ip;
 };
 typedef struct noxs_cfg_vif noxs_cfg_vif_t;
