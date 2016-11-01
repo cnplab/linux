@@ -1,11 +1,3 @@
-/*
- * noxs_thread.c
- *
- *  Created on: Sep 29, 2016
- *      Author: wolf
- */
-
-
 #include <linux/kernel.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
@@ -13,22 +5,17 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/list.h>
-
 #include <xen/events.h>
-
 #include "noxs_comms.h"
 
 
-
-
-static int noxs_thread_create(struct noxs_thread **out_thread,
-		void (*cb)(struct xenbus_watch *watch))
+static struct noxs_thread *noxs_thread_create(void (*cb)(struct xenbus_watch *watch))
 {
 	struct noxs_thread *t;
 
 	t = kzalloc(sizeof(*t), GFP_KERNEL);
 	if (!t)
-		return -ENOMEM;//TODO
+		return NULL;
 
 	mutex_init(&t->mutex);
 	init_waitqueue_head(&t->events_waitq);
@@ -37,23 +24,18 @@ static int noxs_thread_create(struct noxs_thread **out_thread,
 
 	t->otherend_changed = cb;
 
-	*out_thread = t;
-
-	return 0;
+	return t;
 }
 
 static void noxs_thread_destroy(struct noxs_thread *t)
 {
-	struct list_head list;
-
-	list_add_tail(&list, &t->events);
-
-	kthread_stop(t->task);
-	wake_up(&t->events_waitq);
+	mutex_lock(&t->mutex);
+	if (t->active)
+		kthread_stop(t->task);
+	mutex_unlock(&t->mutex);
 
 	kfree(t);
 }
-
 
 static int noxs_thread_func(void *arg)
 {
@@ -62,22 +44,21 @@ static int noxs_thread_func(void *arg)
 	struct noxs_watch_event *event;
 	noxs_ctrl_hdr_t *ctrl_hdr;
 
-	int count = 0;//TODO remove
-
 	t = (struct noxs_thread *) arg;
 
+	mutex_lock(&t->mutex);
+	t->active = true;
+	mutex_unlock(&t->mutex);
+
 	for (;;) {
-		wait_event_interruptible(t->events_waitq, !list_empty(&t->events));
+		wait_event_interruptible(t->events_waitq,
+				!list_empty(&t->events) || kthread_should_stop());
 
 		if (kthread_should_stop())
 			break;
 
+		mutex_lock(&t->mutex);
 		while (!list_empty(&t->events)) {
-
-			printk("----noxs event recvd %d\n", count);
-
-			mutex_lock(&t->mutex);
-
 			spin_lock(&t->events_lock);
 			ent = t->events.next;
 			list_del(ent);
@@ -86,17 +67,15 @@ static int noxs_thread_func(void *arg)
 			event = list_entry(ent, struct noxs_watch_event, list);
 			ctrl_hdr = event->xendev->ctrl_page;
 
-			if (1)//ctrl_hdr->be_watch_state != noxs_watch_none)
+			/* TODO: TBD if we need to check the watch state
+			 * ctrl_hdr->be_watch_state == noxs_watch_requested ?
+			 */
+			if (t->otherend_changed)
 				t->otherend_changed(&event->xendev->otherend_watch);
-			else
-				printk("unrequested watch event: %s.\n", xenbus_strstate(ctrl_hdr->fe_state));
 
 			kfree(event);
-
-			mutex_unlock(&t->mutex);
-
-			count++;
 		}
+		mutex_unlock(&t->mutex);
 	}
 
 	return 0;
@@ -104,12 +83,9 @@ static int noxs_thread_func(void *arg)
 
 static int noxs_thread_run(struct noxs_thread *t)
 {
-	//TODO check t
-
-	t->task = kthread_run(noxs_thread_func, t, "noxs");//TODO name
+	t->task = kthread_run(noxs_thread_func, t, "noxs");
 	if (IS_ERR(t->task))
 		return PTR_ERR(t->task);
-	//xennoxs_pid = task->pid;
 
 	return 0;
 }
@@ -141,17 +117,15 @@ int noxs_comm_watch_otherend(struct xenbus_device *xdev,
 {
 	int err;
 
-	err = noxs_thread_create(&xdev->thread, cb);
-	if (err) {
-		printk("noxs_thread_create failed\n");
+	xdev->thread = noxs_thread_create(cb);
+	if (!xdev->thread) {
+		err = -ENOMEM;
 		goto out_err;
 	}
 
 	err = noxs_thread_run(xdev->thread);
-	if (err) {
-		printk("noxs_thread_run failed\n");
+	if (err)
 		goto fail;
-	}
 
 	err = bind_interdomain_evtchn_to_irqhandler(xdev->otherend_id,
 			xdev->remote_port, wake_waiting, 0, "noxs", xdev);
@@ -168,6 +142,14 @@ fail:
 	noxs_thread_destroy(xdev->thread);//TODO make thread encapsulated
 out_err:
 	return err;
+}
+
+void noxs_comm_free_otherend_watch(struct xenbus_device *xdev)
+{
+	unbind_from_irqhandler(xdev->irq, xdev);
+	xdev->comm_initialized = false;
+	noxs_thread_destroy(xdev->thread);
+	xdev->thread = NULL;
 }
 
 
@@ -213,17 +195,11 @@ int noxs_comm_free(struct xenbus_device *xdev)
 {
 	int ret;
 
-	printk("xenbus_noxs_destroy\n");
-
-	ret = xenbus_free_evtchn(xdev, xdev->remote_port);//TODO do we need to do smth with ret?
-
 	/* This also frees the page */
 	gnttab_end_foreign_access(xdev->grant, 0, (unsigned long) xdev->ctrl_page);
 
 	xdev->grant = INVALID_GRANT_HANDLE;
 	xdev->ctrl_page = NULL;
-
-	printk("xenbus_noxs_destroyed\n");
 
 	return ret;
 }

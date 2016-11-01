@@ -8,6 +8,7 @@
 #ifndef DRIVERS_XEN_NOXS_NOXS_COMMS_H_
 #define DRIVERS_XEN_NOXS_NOXS_COMMS_H_
 
+#include <linux/types.h>
 #include <linux/wait.h>
 #include <xen/noxs.h>
 
@@ -23,6 +24,7 @@ struct noxs_watch_event {
 };
 
 struct noxs_thread {
+	bool active;
 	struct mutex mutex;
 	wait_queue_head_t events_waitq;
 
@@ -35,6 +37,7 @@ struct noxs_thread {
 };
 
 int noxs_comm_watch_otherend(struct xenbus_device *dev, void (*cb)(struct xenbus_watch *watch));
+void noxs_comm_free_otherend_watch(struct xenbus_device *xdev);
 
 
 #endif /* DRIVERS_XEN_NOXS_NOXS_COMMS_H_ */
