@@ -1,18 +1,10 @@
-
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <uapi/xen/noxs.h>
 
-#include <xen/xen.h>
-#include <xen/events.h>
-#include <xen/evtchn.h>
-#include <xen/grant_table.h>
 #include <xen/noxs.h>
-
-#include "noxs_dev_backend.h"
 
 
 static struct xenbus_watch* watch;
@@ -40,7 +32,6 @@ static long noxs_backend_ioctl_dev_create(void __user *udata)
 	rc = watch->create(&k, &dev_create.cfg, &comm);
 	if (rc)
 		goto out;
-	//TODO remove printk("devreq.mfn=%llx\n", devreq.res.mfn);
 
 	dev_create.devid = k.devid;
 	dev_create.grant = comm.grant;
@@ -93,6 +84,29 @@ out:
 	return rc;
 }
 
+static long noxs_backend_ioctl_close(void __user *udata)
+{
+	struct noxs_ioctl_guest_close guest_close;
+	noxs_dev_key_t k;
+	int rc;
+
+	if (copy_from_user(&guest_close, udata, sizeof(guest_close)))
+		return -EFAULT;
+
+	k.type = guest_close.type;
+	k.fe_id = guest_close.domid;
+
+	rc = watch->guest_cmd(guest_close.domid, 0);//TODO create command and add support for other shutdown reasons (command argument)
+	if (rc)
+		goto out;
+
+	if (copy_to_user(udata, &guest_close, sizeof(guest_close)))
+		return -EFAULT;
+
+out:
+	return rc;
+}
+
 static long noxs_backend_ioctl(struct file *file,
 			  unsigned int cmd, unsigned long data)
 {
@@ -113,6 +127,9 @@ static long noxs_backend_ioctl(struct file *file,
 		break;
 	case IOCTL_NOXS_DEV_LIST:
 		ret = noxs_backend_ioctl_dev_list(udata);
+		break;
+	case IOCTL_NOXS_GUEST_CLOSE:
+		ret = noxs_backend_ioctl_close(udata);
 		break;
 	default:
 		ret = -EINVAL;

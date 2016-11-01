@@ -15,3 +15,10 @@ noxs-objs += $(noxs-be-objs-y)
 #obj-$(CONFIG_XEN_BACKEND) += xenbus_dev_backend.o
 obj-$(CONFIG_XEN_BACKEND) += noxs_dev_backend.o
 #obj-$(CONFIG_XEN_XENBUS_FRONTEND) += xenbus_probe_frontend.o
+
+# TODO:
+# - decide if module or built-in
+# - decide if flag for SYSCTLDEV obj-$(CONFIG_XEN_NETDEV_BACKEND) := xen-netback-noxs.o
+#noxs-objs += noxs_sysctlback.o
+obj-m += xen-sysctlback-noxs.o
+xen-sysctlback-noxs-y := noxs_sysctlback.o

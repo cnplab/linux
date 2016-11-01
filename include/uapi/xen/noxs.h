@@ -16,6 +16,7 @@
 
 enum noxs_user_dev_type {
 	noxs_user_dev_none = 0,
+	noxs_user_dev_sysctl,
 	noxs_user_dev_console,
 	noxs_user_dev_vif,
 };
@@ -70,6 +71,15 @@ struct noxs_ioctl_dev_list {
 	__u32 ids[NOXS_USER_DEV_MAX];
 };
 
+enum noxs_user_shutdown_type {
+	noxs_user_sd_none = 0,
+	noxs_user_sd_poweroff
+};
+
+struct noxs_ioctl_guest_close {
+	enum noxs_user_shutdown_type type;
+	__u16 domid;
+};
 
 #define IOCTL_NOXS_DEV_CREATE \
 	_IOC(_IOC_NONE, 'P', 0, sizeof(struct noxs_ioctl_dev_create))
@@ -77,5 +87,7 @@ struct noxs_ioctl_dev_list {
 	_IOC(_IOC_NONE, 'P', 1, sizeof(struct noxs_ioctl_dev_destroy))
 #define IOCTL_NOXS_DEV_LIST \
 	_IOC(_IOC_NONE, 'P', 2, sizeof(struct noxs_ioctl_dev_list))
+#define IOCTL_NOXS_GUEST_CLOSE \
+	_IOC(_IOC_NONE, 'P', 3, sizeof(struct noxs_ioctl_guest_close))
 
 #endif /* INCLUDE_UAPI_XEN_NOXS_H_ */

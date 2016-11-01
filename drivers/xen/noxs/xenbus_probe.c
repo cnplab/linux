@@ -105,7 +105,9 @@ static void free_otherend_details(struct xenbus_device *dev)
 
 static void free_otherend_watch(struct xenbus_device *dev)
 {
-#ifndef CONFIG_XEN_BACKEND_NOXS
+#ifdef CONFIG_XEN_BACKEND_NOXS
+	noxs_comm_free_otherend_watch(dev);
+#else
 	if (dev->otherend_watch.node) {
 		unregister_xenbus_watch(&dev->otherend_watch);
 		kfree(dev->otherend_watch.node);
@@ -682,9 +684,34 @@ void xenbus_dev_list(noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *ou
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_list);//TODO static
 
+void xenbus_guest_close(domid_t domid, struct xen_bus_type *bus)//TODO rename
+{
+	struct xenbus_driver *drv;
+	struct xenbus_device *xdev;
+	struct noxs_query_info info = { .count = 0 };
+
+	info.key.be_id = 0;//TODO
+	info.key.fe_id = domid;
+	info.key.type = noxs_dev_sysctl;
+
+	bus_for_each_dev(&bus->bus, NULL, &info, cmp_dev_query);
+	if (info.count != 1) {
+		DPRINTK("No sysctl device for domid=%d\n", domid);
+		return;
+	}
+
+	xdev = info.devs[0];
+	drv = to_xenbus_driver(xdev->dev.driver);
+
+	if (drv->driver_cmd)
+		drv->driver_cmd(xdev, 0, NULL);
+}
+EXPORT_SYMBOL_GPL(xenbus_guest_close);//TODO static
+
 
 static const char* noxs_dev_type_names[] = {
 		"<none>",
+		"sysctl",
 		"console",
 		"vif"
 };

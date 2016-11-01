@@ -132,6 +132,7 @@ struct xenbus_watch
 	int (*create)(noxs_dev_key_t *key, void *cfg, noxs_dev_comm_t *out_res);
 	int (*destroy)(noxs_dev_key_t *key);
 	int (*query)(noxs_dev_key_t *key, uint32_t *out_num, noxs_dev_id_t out_ids[]);
+	int (*guest_cmd)(domid_t domid, unsigned long cmd);
 };
 
 
@@ -205,6 +206,7 @@ struct xenbus_driver {
 	int (*read_otherend_details)(struct xenbus_device *dev);
 #endif
 	int (*is_ready)(struct xenbus_device *dev);
+	int (*driver_cmd)(struct xenbus_device *dev, unsigned long cmd, void *arg);
 };
 
 static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)

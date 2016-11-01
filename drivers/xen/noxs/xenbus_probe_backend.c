@@ -215,12 +215,21 @@ static int backend_list(noxs_dev_key_t *key, uint32_t *out_num, noxs_dev_id_t ou
 	return 0;
 }
 
+static int backend_cmd(domid_t domid, unsigned long cmd)
+{
+	DPRINTK("");
+
+	xenbus_guest_close(domid, &xenbus_backend);
+	return 0;
+}
+
 static struct xenbus_watch be_watch = {
 	.node = "backend",
 	.callback = NULL,
 	.create = backend_create,
 	.destroy = backend_destroy,
-	.query = backend_list
+	.query = backend_list,
+	.guest_cmd = backend_cmd
 };
 
 #ifndef CONFIG_XEN_BACKEND_NOXS
@@ -241,7 +250,7 @@ int xenbus_dev_is_online(struct xenbus_device *dev)
 
 	return val;
 #else
-	return 0;
+	return 1;
 #endif
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_is_online);
