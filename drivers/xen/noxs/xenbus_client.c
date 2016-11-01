@@ -239,6 +239,23 @@ abort:
 }
 #endif
 
+#ifdef CONFIG_XEN_BACKEND_NOXS
+void noxs_notify_otherend(struct xenbus_device *dev)
+{
+	noxs_ctrl_hdr_t *ctrl_hdr;
+
+	if (dev->comm_initialized == true) {
+		ctrl_hdr = dev->ctrl_page;
+
+		if (ctrl_hdr->fe_watch_state == noxs_watch_requested) {
+			ctrl_hdr->fe_watch_state = noxs_watch_updated;
+			notify_remote_via_irq(dev->irq);
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(noxs_notify_otherend);
+#endif
+
 /**
  * xenbus_switch_state
  * @dev: xenbus device
@@ -250,24 +267,17 @@ abort:
  */
 int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state state)
 {
-#ifndef CONFIG_XEN_BACKEND_NOXS
-	return __xenbus_switch_state(dev, state, 0);
-#else
+#ifdef CONFIG_XEN_BACKEND_NOXS
 	noxs_ctrl_hdr_t *ctrl_hdr;
 
 	ctrl_hdr = dev->ctrl_page;
 	ctrl_hdr->be_state = state;
-	printk("be switched to: %s.\n", xenbus_strstate(state));
-
-	if (ctrl_hdr->fe_watch_state == noxs_watch_requested) {
-		ctrl_hdr->fe_watch_state = noxs_watch_updated;
-		notify_remote_via_irq(dev->irq);
-	}
-
+	noxs_notify_otherend(dev);
 	return 0;
+#else
+	return __xenbus_switch_state(dev, state, 0);
 #endif
 }
-
 EXPORT_SYMBOL_GPL(xenbus_switch_state);
 
 int xenbus_frontend_closed(struct xenbus_device *dev)
