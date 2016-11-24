@@ -44,6 +44,7 @@ int store_write_init_info(struct xenbus_device *xdev)
 	page->ip = cfg->ip;
 	memcpy(page->mac, cfg->mac, sizeof(page->mac));
 	/* TODO script?? */
+	memcpy(page->bridge, cfg->bridge, IF_LEN);
 
 	return 0;
 }
@@ -229,6 +230,13 @@ int store_read_vif_flags(struct xenbus_device *xdev,
 	vif->ipv6_csum = !!page->fe_feat.ipv6_csum_offload;
 
 	return 0;
+}
+
+const char *store_get_bridge(struct xenbus_device *xdev)
+{
+	struct noxs_vif_ctrl_page* page = xdev->ctrl_page;
+
+	return page->bridge;
 }
 
 void store_destroy(void)

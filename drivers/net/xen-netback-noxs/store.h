@@ -46,6 +46,8 @@ int store_read_data_rings_info(struct xenbus_device *xdev,
 int store_read_vif_flags(struct xenbus_device *xdev,
 		struct xenvif *vif);
 
+const char *store_get_bridge(struct xenbus_device *xdev);
+
 void store_destroy(void);//TODO temporary
 
 #endif /* __XEN_NETBACK__STORE_H__ */

@@ -310,6 +310,9 @@ static int netback_uevent(struct xenbus_device *xdev,
 	if (!be)
 		return 0;
 
+	if (add_uevent_var(env, "bridge=%s", store_get_bridge(xdev)))
+		return -ENOMEM;
+
 	if (add_uevent_var(env, "script=%s", be->hotplug_script))
 		return -ENOMEM;
 

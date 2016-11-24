@@ -9,6 +9,7 @@
 #define INCLUDE_UAPI_XEN_NOXS_H_
 
 #include <linux/ioctl.h>
+#include <linux/if.h>
 #include <linux/if_ether.h>
 
 
@@ -28,6 +29,7 @@ enum noxs_user_dev_type {
 struct noxs_user_cfg_vif {
 	__u8 mac[ETH_ALEN];
 	__be32 ip;
+	char bridge[IFNAMSIZ];
 };
 
 
