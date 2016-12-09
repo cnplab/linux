@@ -9,6 +9,7 @@
 
 struct backend_info {
 	struct xenbus_device *dev;
+	wait_queue_head_t ack_waitq;
 };
 
 //TODO move
@@ -53,6 +54,8 @@ static int sysctlback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	dev_set_drvdata(&dev->dev, be);
 
+	init_waitqueue_head(&be->ack_waitq);
+
 	err = store_write_init_info(dev);
 	if (err)
 		goto fail;
@@ -75,7 +78,11 @@ fail:
 static void frontend_changed(struct xenbus_device *dev,
 			     enum xenbus_state frontend_state)
 {
+	struct backend_info *be = dev_get_drvdata(&dev->dev);
+
 	pr_debug("%s %p %s\n", __func__, dev, xenbus_strstate(frontend_state));
+
+	wake_up(&be->ack_waitq);
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
@@ -119,16 +126,40 @@ static void frontend_changed(struct xenbus_device *dev,
 	}
 }
 
+enum noxs_shutdown_type {
+	noxs_sd_none = 0 ,
+	noxs_sd_poweroff ,
+	noxs_sd_suspend
+};
+
 static int sysctlback_command(struct xenbus_device *dev,
 		unsigned long cmd, void *arg)
 {
+	struct backend_info *be = dev_get_drvdata(&dev->dev);
 	noxs_sysctl_ctrl_page_t *page;
+	enum noxs_shutdown_type *sd_type;//TODO no user stuff here
+	int ret;
+
+	if (arg == NULL)
+		return -EINVAL;
+
+	sd_type = (enum noxs_shutdown_type *) arg;
 
 	page = dev->ctrl_page;
-	page->bits.poweroff = 1;
+
+	if (*sd_type == noxs_sd_poweroff)
+		page->bits.poweroff = 1;
+	else if (*sd_type == noxs_sd_suspend)
+		page->bits.suspend = 1;
+	else
+		return -EINVAL;
+
 	noxs_notify_otherend(dev);
 
-	return 0;
+	while (page->hdr.fe_state < XenbusStateClosed)
+		ret = wait_event_interruptible(be->ack_waitq, page->hdr.fe_state == XenbusStateClosed);
+
+	return ret;
 }
 
 static const struct xenbus_device_id sysctlback_ids[] = {

@@ -198,6 +198,18 @@ int store_read_mac(struct xenbus_device *dev, u8 mac[])
 	return 0;
 }
 
+int store_read_ip(struct xenbus_device *dev, uint32_t *ip)
+{
+	/* TODO */
+	return 0;
+}
+
+int store_read_bridge(struct xenbus_device *xdev, char bridge[IF_LEN])
+{
+	/* TODO */
+	return 0;
+}
+
 int store_read_ctrl_ring_info(struct xenbus_device *dev, grant_ref_t *ring_ref, unsigned int *evtchn)
 {
 	unsigned int val;

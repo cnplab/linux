@@ -9,15 +9,22 @@
 #include "store.h"
 
 
+static int netback_alloc_id(struct xenbus_device *xdev);
+
 int store_write_init_info(struct xenbus_device *xdev)
 {
 	noxs_vif_ctrl_page_t *page = xdev->ctrl_page;
 	noxs_cfg_vif_t *cfg = xdev->dev_cfg;
-	int sg = 1;
+	int rc, sg = 1;
+
+	rc = netback_alloc_id(xdev);
+	if (rc)
+		goto out;
 
 	page->hdr.be_state = XenbusStateUnknown;
 	page->hdr.fe_state = XenbusStateUnknown;
-	/*page->vifid = xdev->id; //TODO vc->vif;*/
+	page->hdr.devid = xdev->id;
+	page->vifid = xdev->id;//TODO redundant
 
 	memset(&page->be_feat, 0, sizeof(page->be_feat));//TODO needed?
 	page->be_feat.sg = sg;
@@ -46,7 +53,8 @@ int store_write_init_info(struct xenbus_device *xdev)
 	/* TODO script?? */
 	memcpy(page->bridge, cfg->bridge, IF_LEN);
 
-	return 0;
+out:
+	return rc;
 }
 
 /*********************************************************
@@ -99,18 +107,7 @@ static void netback_clear_ids(void)
 int store_read_handle(struct xenbus_device *xdev,
 		long *handle)
 {
-	noxs_vif_ctrl_page_t *page;
-	int err;
-
-	err = netback_alloc_id(xdev);
-	if (err)
-		return 0;
-
 	*handle = xdev->id;
-
-	/* update control page */
-	page = xdev->ctrl_page;
-	page->vifid = xdev->id;
 
 	return 1;
 }
@@ -125,9 +122,25 @@ void store_read_rate(struct xenbus_device *dev,
 
 int store_read_mac(struct xenbus_device *dev, u8 mac[])
 {
-	struct noxs_vif_ctrl_page *vif_page = dev->ctrl_page;
+	struct noxs_vif_ctrl_page *page = dev->ctrl_page;
 
-	memcpy(mac, vif_page->mac, ETH_ALEN);
+	memcpy(mac, page->mac, ETH_ALEN);
+	return 0;
+}
+
+int store_read_ip(struct xenbus_device *dev, uint32_t *ip)
+{
+	struct noxs_vif_ctrl_page *page = dev->ctrl_page;
+
+	*ip = page->ip;
+	return 0;
+}
+
+int store_read_bridge(struct xenbus_device *xdev, char bridge[IF_LEN])
+{
+	struct noxs_vif_ctrl_page* page = xdev->ctrl_page;
+
+	memcpy(bridge, page->bridge, IF_LEN);
 	return 0;
 }
 
@@ -230,13 +243,6 @@ int store_read_vif_flags(struct xenbus_device *xdev,
 	vif->ipv6_csum = !!page->fe_feat.ipv6_csum_offload;
 
 	return 0;
-}
-
-const char *store_get_bridge(struct xenbus_device *xdev)
-{
-	struct noxs_vif_ctrl_page* page = xdev->ctrl_page;
-
-	return page->bridge;
 }
 
 void store_destroy(void)

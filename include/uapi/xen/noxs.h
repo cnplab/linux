@@ -73,9 +73,22 @@ struct noxs_ioctl_dev_list {
 	__u32 ids[NOXS_USER_DEV_MAX];
 };
 
+struct noxs_ioctl_dev_query_cfg {/* TODO this just has to work; optimization later */
+	/* IN */
+	enum noxs_user_dev_type type;
+	__u16 be_id;
+	__u16 fe_id;
+	__u32 devid;
+
+	union { /* device specific */
+		struct noxs_user_cfg_vif vif;
+	} cfg;
+};
+
 enum noxs_user_shutdown_type {
-	noxs_user_sd_none = 0,
-	noxs_user_sd_poweroff
+	noxs_user_sd_none = 0 ,
+	noxs_user_sd_poweroff ,
+	noxs_user_sd_suspend
 };
 
 struct noxs_ioctl_guest_close {
@@ -89,7 +102,9 @@ struct noxs_ioctl_guest_close {
 	_IOC(_IOC_NONE, 'P', 1, sizeof(struct noxs_ioctl_dev_destroy))
 #define IOCTL_NOXS_DEV_LIST \
 	_IOC(_IOC_NONE, 'P', 2, sizeof(struct noxs_ioctl_dev_list))
+#define IOCTL_NOXS_DEV_QUERY_CFG \
+	_IOC(_IOC_NONE, 'P', 3, sizeof(struct noxs_ioctl_dev_query_cfg))
 #define IOCTL_NOXS_GUEST_CLOSE \
-	_IOC(_IOC_NONE, 'P', 3, sizeof(struct noxs_ioctl_guest_close))
+	_IOC(_IOC_NONE, 'P', 5, sizeof(struct noxs_ioctl_guest_close))
 
 #endif /* INCLUDE_UAPI_XEN_NOXS_H_ */

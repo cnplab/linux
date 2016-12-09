@@ -118,6 +118,13 @@
 #define INVALID_GRANT_HANDLE       (~0U)
 
 
+enum noxs_dev_query_type {
+	noxs_dev_query_none,
+	noxs_dev_query_id,
+	noxs_dev_query_cfg,
+};
+
+
 /* Register callback to watch this node. */
 struct xenbus_watch
 {
@@ -131,8 +138,8 @@ struct xenbus_watch
 
 	int (*create)(noxs_dev_key_t *key, void *cfg, noxs_dev_comm_t *out_res);
 	int (*destroy)(noxs_dev_key_t *key);
-	int (*query)(noxs_dev_key_t *key, uint32_t *out_num, noxs_dev_id_t out_ids[]);
-	int (*guest_cmd)(domid_t domid, unsigned long cmd);
+	int (*query)(enum noxs_dev_query_type qtype, noxs_dev_key_t *key, uint32_t *out_num, void *out_info);
+	int (*guest_cmd)(domid_t domid, unsigned long cmd, void *arg);
 };
 
 
@@ -207,6 +214,7 @@ struct xenbus_driver {
 #endif
 	int (*is_ready)(struct xenbus_device *dev);
 	int (*driver_cmd)(struct xenbus_device *dev, unsigned long cmd, void *arg);
+	int (*device_info)(struct xenbus_device *dev, void *arg);
 };
 
 static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
@@ -273,5 +281,6 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt, ...);
 const char *xenbus_strstate(enum xenbus_state state);
 int xenbus_dev_is_online(struct xenbus_device *dev);
 int xenbus_frontend_closed(struct xenbus_device *dev);
+
 
 #endif /* _XEN_XENBUS_H */

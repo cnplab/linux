@@ -73,8 +73,9 @@ extern struct xenbus_device *xenbus_dev_create(noxs_dev_key_t *key,
 extern void xenbus_dev_destroy(noxs_dev_key_t *key,
 			       struct xen_bus_type *bus);
 extern void xenbus_dev_shutdown(struct device *_dev);
-extern void xenbus_dev_list(noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *out_num, noxs_dev_id_t out_ids[]);
-extern void xenbus_guest_close(domid_t domid, struct xen_bus_type *bus);
+//extern void xenbus_dev_list(noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *out_num, noxs_dev_id_t out_ids[]);
+extern void xenbus_dev_list(enum noxs_dev_query_type qtype, noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *out_num, void *out_info);
+extern int xenbus_guest_close(domid_t domid, void *arg, struct xen_bus_type *bus);
 
 extern int noxs_dev_suspend(struct device *dev);
 extern int noxs_dev_resume(struct device *dev);

@@ -73,11 +73,36 @@ static long noxs_backend_ioctl_dev_list(void __user *udata)
 	k.be_id = dev_list.be_id;
 	k.fe_id = dev_list.fe_id;
 
-	rc = watch->query(&k, &dev_list.count, dev_list.ids);
+	rc = watch->query(noxs_dev_query_id, &k, &dev_list.count, dev_list.ids);
 	if (rc)
 		goto out;
 
 	if (copy_to_user(udata, &dev_list, sizeof(dev_list)))
+		return -EFAULT;
+
+out:
+	return rc;
+}
+
+static long noxs_backend_ioctl_dev_query_cfg(void __user *udata)
+{
+	struct noxs_ioctl_dev_query_cfg dev_query;
+	noxs_dev_key_t k;
+	int count;
+	int rc;
+
+	if (copy_from_user(&dev_query, udata, sizeof(dev_query)))
+		return -EFAULT;
+
+	k.type = dev_query.type;
+	k.be_id = dev_query.be_id;
+	k.fe_id = dev_query.fe_id;
+
+	rc = watch->query(noxs_dev_query_cfg, &k, &count, &dev_query.cfg);
+	if (rc)
+		goto out;
+
+	if (copy_to_user(udata, &dev_query, sizeof(dev_query)))
 		return -EFAULT;
 
 out:
@@ -96,7 +121,7 @@ static long noxs_backend_ioctl_close(void __user *udata)
 	k.type = guest_close.type;
 	k.fe_id = guest_close.domid;
 
-	rc = watch->guest_cmd(guest_close.domid, 0);//TODO create command and add support for other shutdown reasons (command argument)
+	rc = watch->guest_cmd(guest_close.domid, 0, &guest_close.type);//TODO create command and add support for other shutdown reasons (command argument)
 	if (rc)
 		goto out;
 
@@ -127,6 +152,9 @@ static long noxs_backend_ioctl(struct file *file,
 		break;
 	case IOCTL_NOXS_DEV_LIST:
 		ret = noxs_backend_ioctl_dev_list(udata);
+		break;
+	case IOCTL_NOXS_DEV_QUERY_CFG:
+		ret = noxs_backend_ioctl_dev_query_cfg(udata);
 		break;
 	case IOCTL_NOXS_GUEST_CLOSE:
 		ret = noxs_backend_ioctl_close(udata);

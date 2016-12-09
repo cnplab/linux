@@ -306,11 +306,14 @@ static int netback_uevent(struct xenbus_device *xdev,
 			  struct kobj_uevent_env *env)
 {
 	struct backend_info *be = dev_get_drvdata(&xdev->dev);
+	char bridge[IF_LEN];
 
 	if (!be)
 		return 0;
 
-	if (add_uevent_var(env, "bridge=%s", store_get_bridge(xdev)))
+	store_read_bridge(xdev, bridge);//TODO check return
+
+	if (add_uevent_var(env, "bridge=%s", bridge))
 		return -ENOMEM;
 
 	if (add_uevent_var(env, "script=%s", be->hotplug_script))
@@ -686,7 +689,7 @@ static int connect_ctrl_ring(struct backend_info *be)
 	unsigned int evtchn;
 	int err;
 
-	err = store_read_ctrl_ring_info(dev, &ring_ref, &evtchn);
+	err = store_read_ctrl_ring_info(dev, &ring_ref, &evtchn);//otherend
 	if (err)
 		goto fail;
 
@@ -716,7 +719,7 @@ static void connect(struct backend_info *be)
 	/* Check whether the frontend requested multiple queues
 	 * and read the number requested.
 	 */
-	err = store_read_num_queues(dev, &requested_num_queues);
+	err = store_read_num_queues(dev, &requested_num_queues);//from otherend
 	if (err < 0) {
 		requested_num_queues = 1; /* Fall back to single queue */
 	} else if (requested_num_queues > xenvif_max_queues) {
@@ -839,7 +842,7 @@ static int connect_data_rings(struct backend_info *be,
 	int err;
 
 	err = store_read_data_rings_info(dev, queue, &tx_ring_ref, &rx_ring_ref,
-				  &tx_evtchn, &rx_evtchn);
+				  &tx_evtchn, &rx_evtchn);//from otherend
 	if (err)
 		goto err;
 
@@ -864,7 +867,30 @@ static int read_xenbus_vif_flags(struct backend_info *be)
 	struct xenbus_device *dev = be->dev;
 	struct xenvif *vif = be->vif;
 
-	return store_read_vif_flags(dev, vif);
+	return store_read_vif_flags(dev, vif);//otherend
+}
+
+static int netback_device_info(struct xenbus_device *xdev, void *out)
+{
+	noxs_cfg_vif_t *cfg_vif;
+	int err;
+
+	cfg_vif = (noxs_cfg_vif_t *) out;
+
+	err = store_read_mac(xdev, cfg_vif->mac);
+	if (err)
+		goto err;
+
+	err = store_read_ip(xdev, &cfg_vif->ip);
+	if (err)
+		goto err;
+
+	err = store_read_bridge(xdev, cfg_vif->bridge);
+	if (err)
+		goto err;
+
+err:
+	return err;
 }
 
 static const struct xenbus_device_id netback_ids[] = {
@@ -878,6 +904,7 @@ static struct xenbus_driver netback_driver = {
 	.remove = netback_remove,
 	.uevent = netback_uevent,
 	.otherend_changed = frontend_changed,
+	.device_info = netback_device_info,
 };
 
 int xenvif_xenbus_init(void)

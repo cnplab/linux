@@ -207,19 +207,19 @@ static int backend_destroy(noxs_dev_key_t *key)
 	return 0;
 }
 
-static int backend_list(noxs_dev_key_t *key, uint32_t *out_num, noxs_dev_id_t out_ids[])
+static int backend_list(enum noxs_dev_query_type qtype, noxs_dev_key_t *key, uint32_t *out_num, void *out_info)
 {
 	DPRINTK("");
 
-	xenbus_dev_list(key, &xenbus_backend, out_num, out_ids);
+	xenbus_dev_list(qtype, key, &xenbus_backend, out_num, out_info);
 	return 0;
 }
 
-static int backend_cmd(domid_t domid, unsigned long cmd)
+static int backend_cmd(domid_t domid, unsigned long cmd, void *arg)
 {
 	DPRINTK("");
 
-	xenbus_guest_close(domid, &xenbus_backend);
+	xenbus_guest_close(domid, arg, &xenbus_backend);
 	return 0;
 }
 

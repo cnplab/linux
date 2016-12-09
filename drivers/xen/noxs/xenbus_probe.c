@@ -670,21 +670,56 @@ int xenbus_dev_cancel(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_cancel);
 
-void xenbus_dev_list(noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *out_num, noxs_dev_id_t out_ids[])//TODO rename
+static void noxs_collect_id(struct noxs_query_info *info, noxs_dev_id_t *out_ids)
+{
+	int i;
+	for (i = 0; i < info->count; i++) {
+		out_ids[i] = info->devs[i]->id;
+	}
+}
+
+static int noxs_collect_cfg(struct noxs_query_info *info, void *out_cfgs)
+{
+	int err;
+	int i;
+
+	for (i = 0; i < info->count; i++) {
+		struct xenbus_device *xdev = info->devs[i];
+		struct xenbus_driver *drv;
+
+		drv = to_xenbus_driver(xdev->dev.driver);
+
+		if (drv->device_info) {
+			err = drv->device_info(xdev, out_cfgs);
+			if (err)
+				goto err;
+		}
+		/* else TODO return some error
+			return bla;*/
+	}
+
+err:
+	return err;
+}
+
+void xenbus_dev_list(enum noxs_dev_query_type qtype, noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *out_num, void *out_info)//TODO rename
 {
 	int i;
 	struct noxs_query_info info = { .key = *key, .count = 0 };
 
 	bus_for_each_dev(&bus->bus, NULL, &info, cmp_dev_query);
 
-	for (i = 0; i < info.count; i++) {
-		out_ids[i] = info.devs[i]->id;
-	}
+	if (qtype == noxs_dev_query_id)
+		noxs_collect_id(&info, out_info);
+
+	else if (qtype == noxs_dev_query_cfg)
+		noxs_collect_cfg(&info, out_info);
+
 	*out_num = info.count;
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_list);//TODO static
 
-void xenbus_guest_close(domid_t domid, struct xen_bus_type *bus)//TODO rename
+int xenbus_guest_close(domid_t domid, void *arg, struct xen_bus_type *bus)//TODO rename to cmd
 {
 	struct xenbus_driver *drv;
 	struct xenbus_device *xdev;
@@ -697,14 +732,16 @@ void xenbus_guest_close(domid_t domid, struct xen_bus_type *bus)//TODO rename
 	bus_for_each_dev(&bus->bus, NULL, &info, cmp_dev_query);
 	if (info.count != 1) {
 		DPRINTK("No sysctl device for domid=%d\n", domid);
-		return;
+		return -EINVAL;
 	}
 
 	xdev = info.devs[0];
 	drv = to_xenbus_driver(xdev->dev.driver);
 
 	if (drv->driver_cmd)
-		drv->driver_cmd(xdev, 0, NULL);
+		return drv->driver_cmd(xdev, 0, arg);
+	else
+		return -EINVAL;//TODO refine flow
 }
 EXPORT_SYMBOL_GPL(xenbus_guest_close);//TODO static
 

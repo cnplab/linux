@@ -35,6 +35,10 @@ void store_read_rate(struct xenbus_device *dev,
 		unsigned long *bytes, unsigned long *usec);
 int store_read_mac(struct xenbus_device *dev,
 		u8 mac[]);
+int store_read_ip(struct xenbus_device *dev,
+		uint32_t *ip);
+int store_read_bridge(struct xenbus_device *xdev,
+		char bridge[IF_LEN]);
 int store_read_ctrl_ring_info(struct xenbus_device *xdev,
 		grant_ref_t *ring_ref, unsigned int *evtchn);
 int store_read_num_queues(struct xenbus_device *xdev,
@@ -45,8 +49,6 @@ int store_read_data_rings_info(struct xenbus_device *xdev,
 		unsigned int *tx_evtchn, unsigned int *rx_evtchn);
 int store_read_vif_flags(struct xenbus_device *xdev,
 		struct xenvif *vif);
-
-const char *store_get_bridge(struct xenbus_device *xdev);
 
 void store_destroy(void);//TODO temporary
 
