@@ -102,6 +102,9 @@ static long noxs_backend_ioctl_dev_query_cfg(void __user *udata)
 	if (rc)
 		goto out;
 
+	if (count == 0)
+		return -ENODEV;
+
 	if (copy_to_user(udata, &dev_query, sizeof(dev_query)))
 		return -EFAULT;
 
