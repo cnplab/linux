@@ -28,12 +28,12 @@ static long noxs_backend_ioctl_dev_create(void __user *udata)
 	k.type = dev_create.type;
 	k.be_id = dev_create.be_id;
 	k.fe_id = dev_create.fe_id;
+	k.devid = dev_create.devid;
 
 	rc = watch->create(&k, &dev_create.cfg, &comm);
 	if (rc)
 		goto out;
 
-	dev_create.devid = k.devid;
 	dev_create.grant = comm.grant;
 	dev_create.evtchn = comm.evtchn;
 

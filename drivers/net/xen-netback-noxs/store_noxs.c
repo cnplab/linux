@@ -9,17 +9,11 @@
 #include "store.h"
 
 
-static int netback_alloc_id(struct xenbus_device *xdev);
-
 int store_write_init_info(struct xenbus_device *xdev)
 {
 	noxs_vif_ctrl_page_t *page = xdev->ctrl_page;
 	noxs_cfg_vif_t *cfg = xdev->dev_cfg;
-	int rc, sg = 1;
-
-	rc = netback_alloc_id(xdev);
-	if (rc)
-		goto out;
+	int sg = 1;
 
 	page->hdr.be_state = XenbusStateUnknown;
 	page->hdr.fe_state = XenbusStateUnknown;
@@ -53,55 +47,7 @@ int store_write_init_info(struct xenbus_device *xdev)
 	/* TODO script?? */
 	memcpy(page->bridge, cfg->bridge, IF_LEN);
 
-out:
-	return rc;
-}
-
-/*********************************************************
- * TODO TEMPORARY, not a scalable solution:
- */
-
-struct noxs_dev_counter {
-	struct list_head list;
-	domid_t fe_id;
-	int next_id;
-	int dev_num;
-};
-
-static LIST_HEAD(device_counters);
-
-static int netback_alloc_id(struct xenbus_device *xdev)
-{
-	struct noxs_dev_counter *c;
-
-	list_for_each_entry(c, &device_counters, list) {
-		if (c->fe_id == xdev->otherend_id)
-			goto out;
-	}
-
-	c = kzalloc(sizeof(struct noxs_dev_counter), GFP_KERNEL);
-	if (!c) {
-		xenbus_dev_fatal(xdev, -ENOMEM, "allocating device id");
-		return -ENOMEM;
-	}
-
-	c->fe_id = xdev->otherend_id;
-	list_add(&c->list, &device_counters);
-
-out:
-	xdev->id = c->next_id++;
-	c->dev_num++;
 	return 0;
-}
-
-static void netback_clear_ids(void)
-{
-	struct noxs_dev_counter *c, *tmp;
-
-	list_for_each_entry_safe(c, tmp, &device_counters, list) {
-		list_del(&c->list);
-		kfree(c);
-	}
 }
 
 int store_read_handle(struct xenbus_device *xdev,
@@ -247,5 +193,4 @@ int store_read_vif_flags(struct xenbus_device *xdev,
 
 void store_destroy(void)
 {
-	netback_clear_ids();
 }
