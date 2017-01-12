@@ -15,8 +15,8 @@ int store_write_init_info(struct xenbus_device *xdev)
 	noxs_cfg_vif_t *cfg = xdev->dev_cfg;
 	int sg = 1;
 
-	page->hdr.be_state = XenbusStateUnknown;
-	page->hdr.fe_state = XenbusStateUnknown;
+	page->hdr.be_state = XenbusStateInitialising;
+	page->hdr.fe_state = XenbusStateInitialising;
 	page->hdr.devid = xdev->id;
 	page->vifid = xdev->id;//TODO redundant
 

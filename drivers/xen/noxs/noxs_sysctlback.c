@@ -19,8 +19,8 @@ int store_write_init_info(struct xenbus_device *xdev)
 	noxs_sysctl_ctrl_page_t *page;
 
 	page = xdev->ctrl_page;
-	page->hdr.be_state = XenbusStateUnknown;
-	page->hdr.fe_state = XenbusStateUnknown;
+	page->hdr.be_state = XenbusStateInitialising;
+	page->hdr.fe_state = XenbusStateInitialising;
 
 	return 0;
 }
