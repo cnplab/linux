@@ -162,8 +162,6 @@ struct xenbus_device {
 	int irq;
 	evtchn_port_t remote_port;
 
-	struct noxs_thread *thread;
-
 	bool comm_initialized;
 
 	void *dev_cfg;
@@ -200,6 +198,7 @@ struct xenbus_device_id
 struct xenbus_driver {
 	const char *name;       /* defaults to ids[0].devicetype */
 	const struct xenbus_device_id *ids;
+	struct noxs_thread *noxs_thread;
 	int (*probe)(struct xenbus_device *dev,
 		     const struct xenbus_device_id *id);
 	void (*otherend_changed)(struct xenbus_device *dev,

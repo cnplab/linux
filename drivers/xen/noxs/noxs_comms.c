@@ -9,13 +9,15 @@
 #include "noxs_comms.h"
 
 
-static struct noxs_thread *noxs_thread_create(void (*cb)(struct xenbus_watch *watch))
+struct noxs_thread *noxs_comm_thread_create(const char *name, void (*cb)(struct xenbus_watch *watch))
 {
 	struct noxs_thread *t;
 
 	t = kzalloc(sizeof(*t), GFP_KERNEL);
 	if (!t)
 		return NULL;
+
+	sprintf(t->name, "noxs-%s", name);
 
 	mutex_init(&t->mutex);
 	init_waitqueue_head(&t->events_waitq);
@@ -27,7 +29,7 @@ static struct noxs_thread *noxs_thread_create(void (*cb)(struct xenbus_watch *wa
 	return t;
 }
 
-static void noxs_thread_destroy(struct noxs_thread *t)
+void noxs_comm_thread_destroy(struct noxs_thread *t)
 {
 	mutex_lock(&t->mutex);
 	if (t->active)
@@ -37,7 +39,7 @@ static void noxs_thread_destroy(struct noxs_thread *t)
 	kfree(t);
 }
 
-static int noxs_thread_func(void *arg)
+static int noxs_comm_thread_func(void *arg)
 {
 	struct noxs_thread *t;
 	struct list_head *ent;
@@ -81,9 +83,9 @@ static int noxs_thread_func(void *arg)
 	return 0;
 }
 
-static int noxs_thread_run(struct noxs_thread *t)
+int noxs_comm_thread_run(struct noxs_thread *t)
 {
-	t->task = kthread_run(noxs_thread_func, t, "noxs");
+	t->task = kthread_run(noxs_comm_thread_func, t, t->name);
 	if (IS_ERR(t->task))
 		return PTR_ERR(t->task);
 
@@ -93,21 +95,21 @@ static int noxs_thread_run(struct noxs_thread *t)
 static irqreturn_t wake_waiting(int irq, void *unused)
 {
 	struct xenbus_device *xdev;
+	struct xenbus_driver *drv;
 	struct noxs_watch_event *event;
 
 	xdev = (struct xenbus_device *) unused;
+	drv = to_xenbus_driver(xdev->dev.driver);
 
 	if (unlikely(xdev->comm_initialized == false))
 		xdev->comm_initialized = true;
 
-	else {
-		event = kzalloc(sizeof(struct noxs_watch_event), GFP_KERNEL);//TODO check
-		event->xendev = xdev;
+	event = kzalloc(sizeof(struct noxs_watch_event), GFP_KERNEL);//TODO check
+	event->xendev = xdev;
 
-		list_add_tail(&event->list, &xdev->thread->events);
+	list_add_tail(&event->list, &drv->noxs_thread->events);
 
-		wake_up(&xdev->thread->events_waitq);
-	}
+	wake_up(&drv->noxs_thread->events_waitq);
 
 	return IRQ_HANDLED;
 }
@@ -116,16 +118,6 @@ int noxs_comm_watch_otherend(struct xenbus_device *xdev,
 		void (*cb)(struct xenbus_watch *watch))
 {
 	int err;
-
-	xdev->thread = noxs_thread_create(cb);
-	if (!xdev->thread) {
-		err = -ENOMEM;
-		goto out_err;
-	}
-
-	err = noxs_thread_run(xdev->thread);
-	if (err)
-		goto fail;
 
 	err = bind_interdomain_evtchn_to_irqhandler(xdev->otherend_id,
 			xdev->remote_port, wake_waiting, 0, "noxs", xdev);
@@ -139,8 +131,6 @@ int noxs_comm_watch_otherend(struct xenbus_device *xdev,
 	return 0;
 
 fail:
-	noxs_thread_destroy(xdev->thread);//TODO make thread encapsulated
-out_err:
 	return err;
 }
 
@@ -148,8 +138,6 @@ void noxs_comm_free_otherend_watch(struct xenbus_device *xdev)
 {
 	unbind_from_irqhandler(xdev->irq, xdev);
 	xdev->comm_initialized = false;
-	noxs_thread_destroy(xdev->thread);
-	xdev->thread = NULL;
 }
 
 
@@ -191,15 +179,11 @@ out_err:
 	return err;
 }
 
-int noxs_comm_free(struct xenbus_device *xdev)
+void noxs_comm_free(struct xenbus_device *xdev)
 {
-	int ret;
-
 	/* This also frees the page */
 	gnttab_end_foreign_access(xdev->grant, 0, (unsigned long) xdev->ctrl_page);
 
 	xdev->grant = INVALID_GRANT_HANDLE;
 	xdev->ctrl_page = NULL;
-
-	return ret;
 }

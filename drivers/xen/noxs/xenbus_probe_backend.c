@@ -53,9 +53,9 @@
 #include <xen/noxs.h>
 #include <xen/features.h>
 
-#include "xenbus_comms.h"
 #include "xenbus_probe.h"
 
+#include "noxs_comms.h"
 #include "noxs_dev_backend.h"
 
 /* backend/<type>/<fe-uuid>/<id> => <type>-<fe-domid>-<id> */
@@ -257,12 +257,33 @@ EXPORT_SYMBOL_GPL(xenbus_dev_is_online);
 int __noxs_register_backend(struct xenbus_driver *drv, struct module *owner,
 			      const char *mod_name)
 {
+	struct noxs_thread *t;
+	int err;
+
 #ifndef CONFIG_XEN_BACKEND_NOXS
 	drv->read_otherend_details = read_frontend_details;//TODO we need this
 #endif
 
-	return xenbus_register_driver_common(drv, &xenbus_backend,
+	t = noxs_comm_thread_create(drv->ids[0].devicetype, xenbus_backend.otherend_changed);
+	if (!t)
+		return -ENOMEM;
+
+	err = noxs_comm_thread_run(t);
+	if (err)
+		goto fail;
+
+	err = xenbus_register_driver_common(drv, &xenbus_backend,
 					     owner, mod_name);
+	if (err)
+		goto fail;
+
+	drv->noxs_thread = t;
+
+	return 0;
+
+fail:
+	noxs_comm_thread_destroy(t);
+	return err;
 
 }
 EXPORT_SYMBOL_GPL(__noxs_register_backend);
