@@ -156,8 +156,12 @@ static int sysctlback_command(struct xenbus_device *dev,
 
 	noxs_notify_otherend(dev);
 
-	while (page->hdr.fe_state < XenbusStateClosed)
-		ret = wait_event_interruptible(be->ack_waitq, page->hdr.fe_state == XenbusStateClosed);
+	/* FIXME: a more 'non-racey' condition */
+	while (page->hdr.fe_state == XenbusStateConnected) {
+		ret = wait_event_interruptible(be->ack_waitq, page->hdr.fe_state != XenbusStateConnected);
+		if (ret)
+			break;
+	}
 
 	return ret;
 }

@@ -270,9 +270,15 @@ int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state state)
 #ifdef CONFIG_XEN_BACKEND_NOXS
 	noxs_ctrl_hdr_t *ctrl_hdr;
 
+	if (state == dev->state)
+		return 0;
+
 	ctrl_hdr = dev->ctrl_page;
 	ctrl_hdr->be_state = state;
 	noxs_notify_otherend(dev);
+
+	dev->state = state;
+
 	return 0;
 #else
 	return __xenbus_switch_state(dev, state, 0);
