@@ -345,7 +345,6 @@ static int cmp_dev_query(struct device *dev, void *data)
 	struct xenbus_device *xendev = to_xenbus_device(dev);
 	struct noxs_query_info *info = data;
 
-	printk("query fe_id=%d, type=%d\n", xendev->otherend_id, xendev->devicetype);
 
 	if (xendev->otherend_id == info->key.fe_id && 0 /*TODO*/ == info->key.be_id && xendev->devicetype == info->key.type) {//TODO type&co
 		info->devs[info->count++] = xendev;
@@ -477,14 +476,12 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 
 	xendev->dev_cfg = cfg;//TODO hackish
 
-	printk("registering\n");
 
 	/* Register with generic device framework. */
 	err = device_register(&xendev->dev);
 	if (err)
 		goto fail;
 
-	printk("registered\n");
 
 	*out_xdev = xendev;
 
