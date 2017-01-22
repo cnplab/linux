@@ -119,8 +119,8 @@ int noxs_comm_watch_otherend(struct xenbus_device *xdev,
 {
 	int err;
 
-	err = bind_interdomain_evtchn_to_irqhandler(xdev->otherend_id,
-			xdev->remote_port, wake_waiting, 0, "noxs", xdev);
+	err = bind_evtchn_to_irqhandler(xdev->local_port,
+			wake_waiting, 0, "noxs", xdev);
 	if (err < 0) {
 		printk("bind_interdomain_evtchn_to_irqhandler failed\n");
 		goto fail;
@@ -161,7 +161,7 @@ int noxs_comm_init(struct xenbus_device *xdev)
 	xdev->grant = err;
 
 	/* Event channel */
-	err = xenbus_alloc_evtchn_remote(xdev, &xdev->remote_port);
+	err = xenbus_alloc_evtchn(xdev, &xdev->local_port);
 	if (err != 0)
 		goto free_grant;
 

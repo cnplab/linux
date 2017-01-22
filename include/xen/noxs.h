@@ -160,7 +160,7 @@ struct xenbus_device {
 	void *ctrl_page;
 	grant_ref_t grant;
 	int irq;
-	evtchn_port_t remote_port;
+	evtchn_port_t local_port;
 
 	bool comm_initialized;
 

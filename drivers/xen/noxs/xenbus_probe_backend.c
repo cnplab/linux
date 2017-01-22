@@ -193,7 +193,7 @@ static int backend_create(noxs_dev_key_t *key, void *cfg, noxs_dev_comm_t *out_r
 	xdev = xenbus_dev_create(key, cfg, &xenbus_backend);//TODO check return or maybe simplify
 
 	out_res->grant = xdev->grant;
-	out_res->evtchn = xdev->remote_port;
+	out_res->evtchn = xdev->local_port;
 
 	return 0;
 }
