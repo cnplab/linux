@@ -20,6 +20,7 @@ enum noxs_user_dev_type {
 	noxs_user_dev_sysctl,
 	noxs_user_dev_console,
 	noxs_user_dev_vif,
+	noxs_user_dev_vbd,
 };
 
 
