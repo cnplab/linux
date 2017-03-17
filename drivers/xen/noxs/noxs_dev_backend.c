@@ -97,6 +97,7 @@ static long noxs_backend_ioctl_dev_query_cfg(void __user *udata)
 	k.type = dev_query.type;
 	k.be_id = dev_query.be_id;
 	k.fe_id = dev_query.fe_id;
+	k.devid = dev_query.devid;
 
 	rc = watch->query(noxs_dev_query_cfg, &k, &count, &dev_query.cfg);
 	if (rc)
