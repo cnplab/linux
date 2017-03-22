@@ -33,6 +33,25 @@ struct noxs_user_cfg_vif {
 	char bridge[IFNAMSIZ];
 };
 
+enum noxs_user_vbd_type {
+	noxs_user_vbd_type_none = 0,
+	noxs_user_vbd_type_phy,
+	noxs_user_vbd_type_file,
+};
+
+enum noxs_user_vbd_mode {
+	noxs_user_vbd_mode_none = 0,
+	noxs_user_vbd_mode_rdonly,
+	noxs_user_vbd_mode_rdwr,
+};
+
+struct noxs_user_cfg_vbd {
+	unsigned major;
+	unsigned minor;
+	enum noxs_user_vbd_type type;
+	enum noxs_user_vbd_mode mode;
+};
+
 
 /*
  *
@@ -46,6 +65,7 @@ struct noxs_ioctl_dev_create {
 
 	union { /* device specific */
 		struct noxs_user_cfg_vif vif;
+		struct noxs_user_cfg_vbd vbd;
 	} cfg;
 
 	/* OUT */
@@ -83,6 +103,7 @@ struct noxs_ioctl_dev_query_cfg {/* TODO this just has to work; optimization lat
 
 	union { /* device specific */
 		struct noxs_user_cfg_vif vif;
+		struct noxs_user_cfg_vbd vbd;
 	} cfg;
 };
 
