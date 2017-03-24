@@ -235,6 +235,15 @@ int __must_check __noxs_register_backend(struct xenbus_driver *drv,
 
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
+//TODO remove:
+struct xenbus_transaction
+{
+	u32 id;
+};
+
+/* Nil transaction ID. */
+#define XBT_NIL ((struct xenbus_transaction) { 0 })
+
 /* notifer routines for when the xenstore comes up */
 extern int xenstored_ready;
 int register_xenstore_notifier(struct notifier_block *nb);
@@ -251,6 +260,11 @@ struct work_struct;
 
 void noxs_probe(struct work_struct *);
 void noxs_notify_otherend(struct xenbus_device *dev);
+
+
+//TODO
+#define XENBUS_EXIST_ERR(err) ((err) == -ENOENT || (err) == -ERANGE)
+
 int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state new_state);
 int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
 		      unsigned int nr_pages, grant_ref_t *grefs);

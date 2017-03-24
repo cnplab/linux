@@ -27,41 +27,46 @@
 #ifndef __XEN_BLKBACK__STORE_H__
 #define __XEN_BLKBACK__STORE_H__
 
+
+int store_write_init_info(struct xenbus_device *xdev);
+int store_read_cfg(struct xenbus_device *xdev, void *cfg);
+
+int store_watch_be(struct xenbus_device *xdev, struct xenbus_watch *watch, void (*cb)(struct xenbus_watch *watch, const char **vec, unsigned int len));
+
+int store_read_be_node(struct xenbus_device *xdev, unsigned *major, unsigned *minor);
+int store_read_be_devname(struct xenbus_device *xdev, struct xen_blkif *blkif, char *buf);//TODO check params
+int store_read_be_mode(struct xenbus_device *xdev, char **mode);
+int store_read_be_device_type(struct xenbus_device *xdev, char **device_type);
+int store_read_be_handle(struct xenbus_device *xdev, unsigned long *handle);
+
+int store_write_be_feat_flush_cache(struct xenbus_device *xdev, struct xenbus_transaction xbt,
+				  int state);
+//static void xen_blkbk_discard(struct xenbus_transaction xbt, struct backend_info *be);
+
+int store_write_be_feat_barrier(struct xenbus_device *xdev, struct xenbus_transaction xbt,
+				  int state);
+int store_write_provide_fe_info(struct xenbus_device *xdev, struct xen_blkif *blkif);
+
+int store_read_fe_protocol(struct xenbus_device *xdev, char *protocol);
+int store_read_fe_persistent(struct xenbus_device *xdev, unsigned int *pers_grants);
+int store_read_num_queues(struct xenbus_device *xdev, unsigned int *requested_num_queues);
+
+
+int store_write_sectors_num(struct xenbus_device *xdev, unsigned long long sectors);
+
+int store_read_ring_page_order(struct xenbus_device *xdev, unsigned int *ring_page_order);
+
 struct store_ring_ref {
 	int index;
 	void *store_address;
 };
 
+int store_ring_ref_init(struct store_ring_ref* srref,
+		struct xenbus_device *xdev, int ring_index);
+void store_ring_ref_clear(struct store_ring_ref* srref);
+const char* store_ring_ref_str(const struct store_ring_ref* srref);
 
-int store_write_init_info(struct xenbus_device *dev);
-
-int store_watch_be(struct xenbus_device *dev, struct xenbus_watch *watch, void (*cb)(struct xenbus_watch *watch, const char **vec, unsigned int len));
-
-int store_read_be_version(struct xenbus_device *dev, unsigned *major, unsigned *minor);
-int store_read_be_mode(struct xenbus_device *dev, char **mode);
-int store_read_be_device_type(struct xenbus_device *dev, char **device_type);
-int store_read_be_handle(struct xenbus_device *dev, unsigned long *handle);
-
-int store_write_be_feat_flush_cache(struct xenbus_device *dev, struct xenbus_transaction xbt,
-				  int state);
-//static void xen_blkbk_discard(struct xenbus_transaction xbt, struct backend_info *be);
-
-int store_write_be_feat_barrier(struct xenbus_device *dev, struct xenbus_transaction xbt,
-				  int state);
-void store_write_provide_fe_info(struct xenbus_device *dev, struct xen_blkif *blkif);
-
-int store_read_fe_protocol(struct xenbus_device *dev, char *protocol);
-int store_read_fe_persistent(struct xenbus_device *dev, unsigned int *pers_grants);
-int store_read_num_queues(struct xenbus_device *dev, unsigned int *requested_num_queues);
-
-int store_ring_ref_init(struct xenbus_device *dev, struct store_ring_ref* ref, int ring_index);
-void store_ring_ref_clear(struct store_ring_ref* ref);
-const char* store_ring_ref_str(const struct store_ring_ref* ref);
-
-int store_read_event_channel(struct xenbus_device *dev, struct store_ring_ref* ref, unsigned int *evtchn);
-int store_read_ring_page_order(struct xenbus_device *dev, struct store_ring_ref* ref, unsigned int *ring_page_order);
-int store_read_ring_ref(struct xenbus_device *dev, struct store_ring_ref* ref, int ref_index, unsigned int *ring_ref);
-
-int store_write_sectors_num(struct xenbus_device *dev, unsigned long long sectors);
+int store_read_event_channel(struct store_ring_ref* ring_ref, unsigned int *evtchn);
+int store_read_ring_ref(struct store_ring_ref* srref, int ref_index, unsigned int *ring_ref);
 
 #endif /* __XEN_BLKBACK__STORE_H__ */

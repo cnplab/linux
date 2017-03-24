@@ -60,23 +60,7 @@ static void xen_blkif_deferred_free(struct work_struct *work)
 
 static int blkback_name(struct xen_blkif *blkif, char *buf)
 {
-	char *devpath, *devname;
-	struct xenbus_device *dev = blkif->be->dev;
-
-	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath))
-		return PTR_ERR(devpath);
-
-	devname = strstr(devpath, "/dev/");
-	if (devname != NULL)
-		devname += strlen("/dev/");
-	else
-		devname  = devpath;
-
-	snprintf(buf, TASK_COMM_LEN, "%d.%s", blkif->domid, devname);
-	kfree(devpath);
-
-	return 0;
+	return store_read_be_devname(NULL, blkif, buf);//TODO revisit call
 }
 
 static void xen_update_blkif_status(struct xen_blkif *blkif)
@@ -495,7 +479,7 @@ static int xen_blkbk_remove(struct xenbus_device *dev)
 		xenvbd_sysfs_delif(dev);
 
 	if (be->backend_watch.node) {
-		unregister_xenbus_watch(&be->backend_watch);
+		//TODO unregister_xenbus_watch(&be->backend_watch);
 		kfree(be->backend_watch.node);
 		be->backend_watch.node = NULL;
 	}
@@ -603,7 +587,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	pr_debug("%s %p %d\n", __func__, dev, dev->otherend_id);
 
-	err = store_read_be_version(dev, &major, &minor);
+	err = store_read_be_node(dev, &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/*
 		 * Since this watch will fire once immediately after it is
@@ -688,7 +672,7 @@ static void frontend_changed(struct xenbus_device *dev,
 	switch (frontend_state) {
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
-			pr_info("%s: prepare for reconnect\n", dev->nodename);
+			pr_info("%s: prepare for reconnect\n", to_xenbus_name(dev));
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
 		break;
@@ -758,17 +742,25 @@ static void frontend_changed(struct xenbus_device *dev,
 static void connect(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
+	int err;
 
-	pr_debug("%s %s\n", __func__, dev->otherend);
+	pr_debug("%s %s\n", __func__, to_xenbus_otherend(dev));
 
 	/* Supply the information about the device the frontend needs */
-	store_write_provide_fe_info(dev, be->blkif);
+	err = store_write_provide_fe_info(dev, be->blkif);
+	if (err)
+		return;
+
+	err = xenbus_switch_state(dev, XenbusStateConnected);
+	if (err)
+		xenbus_dev_fatal(dev, err, "%s: switching to Connected state",
+				 to_xenbus_name(dev));
 }
 
 /*
  * Each ring may have multi pages, depends on "ring-page-order".
  */
-static int read_per_ring_refs(struct xen_blkif_ring *ring, struct store_ring_ref* store_ring_ref)
+static int read_per_ring_refs(struct xen_blkif_ring *ring, struct store_ring_ref *srref)
 {
 	unsigned int ring_ref[XENBUS_MAX_RING_GRANTS];
 	struct pending_req *req, *n;
@@ -777,21 +769,21 @@ static int read_per_ring_refs(struct xen_blkif_ring *ring, struct store_ring_ref
 	struct xenbus_device *dev = blkif->be->dev;
 	unsigned int ring_page_order, nr_grefs, evtchn;
 
-	err = store_read_event_channel(dev, store_ring_ref, &evtchn);
+	err = store_read_event_channel(srref, &evtchn);
 	if (err != 1) {
 		err = -EINVAL;
 		xenbus_dev_fatal(dev, err, "reading %s/event-channel",
-				store_ring_ref_str(store_ring_ref));
+				store_ring_ref_str(srref));
 		return err;
 	}
 
-	err = store_read_ring_page_order(dev, store_ring_ref, &ring_page_order);
+	err = store_read_ring_page_order(dev, &ring_page_order);
 	if (err != 1) {
-		err = store_read_ring_ref(dev, store_ring_ref, -1, &ring_ref[0]);
+		err = store_read_ring_ref(srref, -1, &ring_ref[0]);
 		if (err != 1) {
 			err = -EINVAL;
 			xenbus_dev_fatal(dev, err, "reading %s/ring-ref",
-					store_ring_ref_str(store_ring_ref));
+					store_ring_ref_str(srref));
 			return err;
 		}
 		nr_grefs = 1;
@@ -801,18 +793,18 @@ static int read_per_ring_refs(struct xen_blkif_ring *ring, struct store_ring_ref
 		if (ring_page_order > xen_blkif_max_ring_order) {
 			err = -EINVAL;
 			xenbus_dev_fatal(dev, err, "%s/request %d ring page order exceed max:%d",
-					 store_ring_ref_str(store_ring_ref), ring_page_order,
+					 store_ring_ref_str(srref), ring_page_order,
 					 xen_blkif_max_ring_order);
 			return err;
 		}
 
 		nr_grefs = 1 << ring_page_order;
 		for (i = 0; i < nr_grefs; i++) {
-			err = store_read_ring_ref(dev, store_ring_ref, i, &ring_ref[i]);
+			err = store_read_ring_ref(srref, i, &ring_ref[i]);
 			if (err != 1) {
 				err = -EINVAL;
 				xenbus_dev_fatal(dev, err, "reading %s/ring-ref%u",
-						 store_ring_ref_str(store_ring_ref), i);
+						 store_ring_ref_str(srref), i);
 				return err;
 			}
 		}
@@ -874,7 +866,7 @@ static int connect_ring(struct backend_info *be)
 	unsigned int requested_num_queues = 0;
 	struct store_ring_ref store_ring_ref;
 
-	pr_debug("%s %s\n", __func__, dev->otherend);
+	pr_debug("%s %s\n", __func__, to_xenbus_otherend(dev));
 
 	be->blkif->blk_protocol = BLKIF_PROTOCOL_DEFAULT;
 	err = store_read_fe_protocol(dev, protocol);
@@ -917,27 +909,31 @@ static int connect_ring(struct backend_info *be)
 	if (xen_blkif_alloc_rings(be->blkif))
 		return -ENOMEM;
 
-	pr_info("%s: using %d queues, protocol %d (%s) %s\n", dev->nodename,
+	pr_info("%s: using %d queues, protocol %d (%s) %s\n", to_xenbus_name(dev),
 		 be->blkif->nr_rings, be->blkif->blk_protocol, protocol,
 		 pers_grants ? "persistent grants" : "");
 
 	if (be->blkif->nr_rings == 1) {
-		store_ring_ref_init(dev, &store_ring_ref, -1);
+		store_ring_ref_init(&store_ring_ref, dev, -1);
 		err = read_per_ring_refs(&be->blkif->rings[0], &store_ring_ref);
 		store_ring_ref_clear(&store_ring_ref);
 	}
 	else {
 		for (i = 0; i < be->blkif->nr_rings; i++) {
-			store_ring_ref_init(dev, &store_ring_ref, i);
+			store_ring_ref_init(&store_ring_ref, dev, i);
 			err = read_per_ring_refs(&be->blkif->rings[i], &store_ring_ref);
-			if (err) {
-				store_ring_ref_clear(&store_ring_ref);
-				return err;
-			}
 			store_ring_ref_clear(&store_ring_ref);
+
+			if (err)
+				break;
 		}
 	}
 	return err;
+}
+
+static int blkback_device_info(struct xenbus_device *xdev, void *out)
+{
+	return store_read_cfg(xdev, (noxs_cfg_vbd_t *) out);
 }
 
 static const struct xenbus_device_id xen_blkbk_ids[] = {
@@ -949,7 +945,8 @@ static struct xenbus_driver xen_blkbk_driver = {
 	.ids  = xen_blkbk_ids,
 	.probe = xen_blkbk_probe,
 	.remove = xen_blkbk_remove,
-	.otherend_changed = frontend_changed
+	.otherend_changed = frontend_changed,
+	.device_info = blkback_device_info,
 };
 
 int xen_blkif_xenbus_init(void)

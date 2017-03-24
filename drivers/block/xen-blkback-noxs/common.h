@@ -40,7 +40,12 @@
 #include <asm/hypervisor.h>
 #include <xen/grant_table.h>
 #include <xen/page.h>
+//TODO uncomment #ifdef CONFIG_XEN_BACKEND_NOXS
+#if 1
+#include <xen/noxs.h>
+#else
 #include <xen/xenbus.h>
+#endif
 #include <xen/interface/io/ring.h>
 #include <xen/interface/io/blkif.h>
 #include <xen/interface/io/protocols.h>

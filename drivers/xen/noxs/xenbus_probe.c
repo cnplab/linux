@@ -703,7 +703,6 @@ err:
 
 void xenbus_dev_list(enum noxs_dev_query_type qtype, noxs_dev_key_t *key, struct xen_bus_type *bus, uint32_t *out_num, void *out_info)//TODO rename
 {
-	int i;
 	struct noxs_query_info info = { .key = *key, .count = 0 };
 
 	bus_for_each_dev(&bus->bus, NULL, &info, cmp_dev_query);
@@ -749,7 +748,8 @@ static const char* noxs_dev_type_names[] = {
 		"<none>",
 		"sysctl",
 		"console",
-		"vif"
+		"vif",
+		"vbd"
 };
 
 const char* noxs_dev_type_to_str(noxs_dev_type_t type)

@@ -1,3 +1,3 @@
-obj-$(CONFIG_XEN_BLKDEV_BACKEND) := xen-blkback.o
+obj-$(CONFIG_XEN_BLKDEV_BACKEND) := xen-blkback-noxs.o
 
-xen-blkback-y	:= blkback.o xenbus.o store_xenbus.o
+xen-blkback-noxs-y	:= blkback.o xenbus.o store_noxs.o
